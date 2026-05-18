@@ -80,6 +80,26 @@ public final class RoomService {
         return room;
     }
 
+    public void leaveWaitingRoom(UUID accountId) {
+        Optional<Room> maybeRoom = activeRoom(accountId);
+        if (maybeRoom.isEmpty()) {
+            return;
+        }
+        Room room = maybeRoom.orElseThrow();
+        if (room.status() != RoomStatus.WAITING) {
+            return;
+        }
+        if (room.hostAccountId().equals(accountId)) {
+            for (Account seat : room.seats()) {
+                activeRoomByAccount.remove(seat.id());
+            }
+            rooms.remove(room.code());
+            return;
+        }
+        room.removeSeat(accountId);
+        activeRoomByAccount.remove(accountId);
+    }
+
     public GameEngine startGame(UUID hostAccountId, String code) {
         Room room = requireRoom(code);
         UUID gameId = UUID.randomUUID();
@@ -204,4 +224,3 @@ public final class RoomService {
         return new HashMap<>(games);
     }
 }
-
