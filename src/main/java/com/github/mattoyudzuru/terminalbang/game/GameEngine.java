@@ -207,10 +207,11 @@ public final class GameEngine {
         player.reconnect();
         state.addLog(player.nickname() + " reconnected.");
         if (state.phase() != GamePhase.FINISHED
-                && state.currentPlayer().accountId().equals(accountId)
-                && !state.currentTurnDrawn()) {
-            drawCards(state, player, 2, random);
-            state.setCurrentTurnDrawn(true);
+                && state.currentPlayer().accountId().equals(accountId)) {
+            if (!state.currentTurnDrawn()) {
+                drawCards(state, player, 2, random);
+                state.setCurrentTurnDrawn(true);
+            }
             state.clearCurrentTurnDeadline();
         }
     }
@@ -422,4 +423,3 @@ public final class GameEngine {
         state.drawPile().addAll(cards);
     }
 }
-
