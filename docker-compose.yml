@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: terminal_bang
+      POSTGRES_USER: terminal_bang
+      POSTGRES_PASSWORD: terminal_bang
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U terminal_bang -d terminal_bang"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TB_DB_URL: jdbc:postgresql://postgres:5432/terminal_bang
+      TB_DB_USER: terminal_bang
+      TB_DB_PASSWORD: terminal_bang
+      TB_SSH_PORT: 2222
+      TB_HOST_KEY_PATH: /app/data/hostkey.ser
+    ports:
+      - "2222:2222"
+    volumes:
+      - app_data:/app/data
+
+volumes:
+  postgres_data:
+  app_data:
+
