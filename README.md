@@ -40,6 +40,68 @@ ssh -p 2222 game.example.com
 - reconnect по тому же SSH-ключу;
 - сохранение результата и статистики матча.
 
+## Быстрый запуск
+
+Локально нужен PostgreSQL:
+
+```bash
+createdb terminal_bang
+export TB_DB_URL=jdbc:postgresql://localhost:5432/terminal_bang
+export TB_DB_USER=terminal_bang
+export TB_DB_PASSWORD=terminal_bang
+gradle run
+```
+
+Через Docker Compose:
+
+```bash
+docker compose up --build
+ssh -p 2222 game.example.com
+```
+
+Для локальной проверки:
+
+```bash
+ssh -p 2222 localhost
+```
+
+Переменные окружения:
+
+```text
+TB_SSH_PORT       default 2222
+TB_HOST_KEY_PATH  default data/hostkey.ser
+TB_DB_URL         default jdbc:postgresql://localhost:5432/terminal_bang
+TB_DB_USER        default terminal_bang
+TB_DB_PASSWORD    default terminal_bang
+TB_DB_POOL_SIZE   default 8
+```
+
+## Реализовано сейчас
+
+- Gradle Java application.
+- PostgreSQL schema + Flyway migrations.
+- SSH server на Apache MINA SSHD.
+- Public key auth по SSH fingerprint.
+- Account/profile по fingerprint.
+- Главное меню, профиль, settings nickname, leaderboard.
+- Create/join private room по 5-буквенному коду.
+- Public rooms catalog.
+- Host controls: public/private toggle, start, kick, close room.
+- Game engine: 4-7 игроков, роли, стартовый Sheriff, ходы, рука, колода, сброс.
+- Базовые карты: Shot, Dodge, Saloon, Trail Ride, Disarm, Rustle, Standoff.
+- Target selection, pending reactions, discard phase.
+- Disconnect/reconnect state, timeout skip, abandoned match.
+- Match stats persistence.
+- Unit tests для engine, rooms и renderer.
+
+Ограничения текущего MVP:
+
+- TUI пока простой ANSI-интерфейс, не финальный красивый веер карт.
+- Resize определяется по начальному `COLUMNS/LINES`; live resize через WINCH ещё не реализован.
+- Нет полного набора карт, персонажных способностей, оружия и модификаторов дистанции.
+- Нет AI/bot игроков; для матча нужны реальные SSH-сессии.
+- Нет рейтинга, spectator mode и чата.
+
 ## Управление
 
 ```text
@@ -49,6 +111,7 @@ Enter       подтвердить действие
 Backspace   назад / отмена
 ? или /      описание выбранной карты
 Tab         переключение UI-зоны, если понадобится
+E           закончить ход
 Q           меню выхода
 ```
 
