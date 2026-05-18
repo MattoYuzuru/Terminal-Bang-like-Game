@@ -1,0 +1,11 @@
+.git/
+.gradle/
+build/
+out/
+.idea/
+*.iml
+
+data/
+hostkey.ser
+hostkey.pem
+*.log
