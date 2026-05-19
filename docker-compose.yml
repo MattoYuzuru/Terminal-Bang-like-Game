@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:18
+    restart: unless-stopped
     environment:
       POSTGRES_DB: terminal_bang
       POSTGRES_USER: terminal_bang
@@ -15,6 +16,7 @@ services:
 
   app:
     build: .
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
