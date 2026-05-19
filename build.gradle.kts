@@ -22,6 +22,7 @@ application {
 dependencies {
     implementation("org.apache.sshd:sshd-core:2.17.1")
     implementation("org.apache.sshd:sshd-common:2.17.1")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.84")
     implementation("org.jline:jline:3.30.13")
     implementation("com.zaxxer:HikariCP:7.0.2")
     implementation("org.flywaydb:flyway-core:12.6.1")
