@@ -1,8 +1,11 @@
 package com.github.mattoyudzuru.terminalbang.tui;
 
 import com.github.mattoyudzuru.terminalbang.game.CardInstance;
+import com.github.mattoyudzuru.terminalbang.game.CardKind;
 import com.github.mattoyudzuru.terminalbang.game.GamePhase;
 import com.github.mattoyudzuru.terminalbang.game.GameState;
+import com.github.mattoyudzuru.terminalbang.game.PendingAction;
+import com.github.mattoyudzuru.terminalbang.game.PendingActionType;
 import com.github.mattoyudzuru.terminalbang.game.PlayerState;
 import com.github.mattoyudzuru.terminalbang.room.Room;
 import com.github.mattoyudzuru.terminalbang.room.RoomStatus;
@@ -19,6 +22,13 @@ public final class TerminalRenderer {
     private static final String CLEAR = "\u001B[2J\u001B[H";
     private static final String BOLD = "\u001B[1m";
     private static final String DIM = "\u001B[2m";
+    private static final String RED = "\u001B[31m";
+    private static final String GREEN = "\u001B[32m";
+    private static final String YELLOW = "\u001B[33m";
+    private static final String BLUE = "\u001B[34m";
+    private static final String MAGENTA = "\u001B[35m";
+    private static final String CYAN = "\u001B[36m";
+    private static final String WHITE = "\u001B[37m";
     private static final String RESET = "\u001B[0m";
 
     public String resizeWarning(TerminalSize size) {
@@ -105,7 +115,7 @@ public final class TerminalRenderer {
 
     public String lobby(Room room, Account account) {
         StringBuilder builder = new StringBuilder(CLEAR)
-                .append(title("Room " + room.code()))
+                .append(title("Room " + room.code() + " | You: " + account.nickname()))
                 .append("Visibility: ")
                 .append(room.visibility())
                 .append(" | Status: ")
@@ -136,30 +146,26 @@ public final class TerminalRenderer {
     }
 
     public String game(GameState state, UUID viewerAccountId, String roomCode, GameUiState uiState) {
+        PlayerState viewer = state.findPlayer(viewerAccountId).orElse(null);
         StringBuilder builder = new StringBuilder(CLEAR)
-                .append(title("Room " + roomCode + " | Match " + shortId(state.id())))
-                .append("Deck: ")
-                .append(state.drawPileSize())
-                .append(" | Discard: ")
-                .append(state.topDiscard().map(CardInstance::name).orElse("-"))
-                .append(" | Phase: ")
-                .append(state.phase())
+                .append(header(roomCode, state, viewer))
                 .append("\r\n\r\n");
 
-        appendPlayers(builder, state, viewerAccountId, uiState);
-        builder.append("\r\n");
+        appendTable(builder, state, viewerAccountId, uiState);
+        builder.append("\r\n\r\n");
 
-        Optional<PlayerState> viewer = state.findPlayer(viewerAccountId);
-        viewer.ifPresent(player -> appendHand(builder, player, uiState));
-
-        builder.append("\r\n");
         state.pendingAction().ifPresentOrElse(
-                pending -> builder.append(BOLD).append(pending.prompt()).append(RESET).append("\r\n"),
+                pending -> appendPending(builder, state, viewerAccountId, pending),
                 () -> appendTurnHint(builder, state, viewerAccountId, uiState)
         );
 
+        builder.append("\r\n");
+        if (viewer != null) {
+            appendHand(builder, viewer, uiState);
+        }
+
         if (!uiState.message().isBlank()) {
-            builder.append("\r\n").append(uiState.message()).append("\r\n");
+            builder.append("\r\n").append(color(uiState.message(), YELLOW)).append("\r\n");
         }
 
         builder.append("\r\n").append(DIM).append("Log").append(RESET).append("\r\n");
@@ -182,56 +188,140 @@ public final class TerminalRenderer {
         return CLEAR + title(title) + message + "\r\n\r\nPress any key to continue.\r\n";
     }
 
-    private static void appendPlayers(StringBuilder builder, GameState state, UUID viewerAccountId, GameUiState uiState) {
-        List<PlayerState> targets = targets(state, viewerAccountId);
-        for (int i = 0; i < state.players().size(); i++) {
-            PlayerState player = state.players().get(i);
-            boolean current = state.currentPlayer().accountId().equals(player.accountId());
-            boolean selectedTarget = uiState.focus() == GameFocus.TARGET
-                    && targets.size() > uiState.selectedTarget()
-                    && targets.get(uiState.selectedTarget()).accountId().equals(player.accountId());
-            builder.append(current ? "=> " : "   ");
-            builder.append(selectedTarget ? BOLD + "[" : " ");
-            builder.append(player.nickname())
-                    .append(" HP=")
-                    .append(player.health())
-                    .append("/")
-                    .append(player.maxHealth())
-                    .append(" cards=")
-                    .append(player.handSize())
-                    .append(" role=")
-                    .append(visibleRole(player, viewerAccountId))
-                    .append(player.connected() ? "" : " disconnected")
-                    .append(player.eliminated() ? " eliminated" : "");
-            builder.append(selectedTarget ? "]" + RESET : "");
-            builder.append("\r\n");
+    private static String header(String roomCode, GameState state, PlayerState viewer) {
+        String nickname = viewer == null ? "unknown" : viewer.nickname();
+        return BOLD + color("Room " + roomCode, CYAN)
+                + RESET + " | " + color("Match " + shortId(state.id()), MAGENTA)
+                + " | You: " + color(nickname, GREEN)
+                + " | Phase: " + color(state.phase().name(), phaseColor(state.phase()))
+                + RESET;
+    }
+
+    private static void appendTable(StringBuilder builder, GameState state, UUID viewerAccountId, GameUiState uiState) {
+        Optional<PlayerState> maybeViewer = state.findPlayer(viewerAccountId);
+        List<PlayerState> others = state.players().stream()
+                .filter(player -> !player.accountId().equals(viewerAccountId))
+                .toList();
+        List<PlayerState> top = others.stream().limit(3).toList();
+        List<PlayerState> lower = others.stream().skip(3).toList();
+
+        builder.append(center(joinSeats(top, state, viewerAccountId, uiState), 92)).append("\r\n");
+        builder.append(center(color("      .------------------------------------------.", BLUE), 92)).append("\r\n");
+        builder.append(center(color("   .-'                                            '-.", BLUE), 92)).append("\r\n");
+
+        String left = lower.isEmpty() ? "" : seatLabel(lower.getFirst(), state, viewerAccountId, uiState);
+        String right = lower.size() < 2 ? "" : seatLabel(lower.get(1), state, viewerAccountId, uiState);
+        String middle = color("Deck " + state.drawPileSize(), GREEN)
+                + "    "
+                + color("Discard " + state.topDiscard().map(CardInstance::name).orElse("-"), YELLOW);
+        builder.append(fit(left, 31))
+                .append(color(" | ", BLUE))
+                .append(center(middle, 28))
+                .append(color(" | ", BLUE))
+                .append(fit(right, 31))
+                .append("\r\n");
+
+        String left2 = lower.size() < 3 ? "" : seatLabel(lower.get(2), state, viewerAccountId, uiState);
+        String right2 = lower.size() < 4 ? "" : seatLabel(lower.get(3), state, viewerAccountId, uiState);
+        builder.append(fit(left2, 31))
+                .append(color(" | ", BLUE))
+                .append(center(color("active table", DIM), 28))
+                .append(color(" | ", BLUE))
+                .append(fit(right2, 31))
+                .append("\r\n");
+
+        builder.append(center(color("   '-.                                            .-'", BLUE), 92)).append("\r\n");
+        builder.append(center(color("      '------------------------------------------'", BLUE), 92)).append("\r\n");
+        maybeViewer.ifPresent(viewer -> builder.append(center(seatLabel(viewer, state, viewerAccountId, uiState) + "  " + color("[YOU]", GREEN), 92)).append("\r\n"));
+    }
+
+    private static String joinSeats(List<PlayerState> players, GameState state, UUID viewerAccountId, GameUiState uiState) {
+        if (players.isEmpty()) {
+            return color("Waiting for seats", DIM);
         }
+        return players.stream()
+                .map(player -> seatLabel(player, state, viewerAccountId, uiState))
+                .reduce((left, right) -> left + "     " + right)
+                .orElse("");
+    }
+
+    private static String seatLabel(PlayerState player, GameState state, UUID viewerAccountId, GameUiState uiState) {
+        List<PlayerState> targets = targets(state, viewerAccountId);
+        boolean current = state.currentPlayer().accountId().equals(player.accountId());
+        boolean selectedTarget = uiState.focus() == GameFocus.TARGET
+                && targets.size() > uiState.selectedTarget()
+                && targets.get(uiState.selectedTarget()).accountId().equals(player.accountId());
+        String marker = current ? color(">", YELLOW) : " ";
+        String nickname = player.accountId().equals(viewerAccountId) ? player.nickname() : player.nickname();
+        String text = marker
+                + nickname
+                + " HP " + healthBar(player)
+                + " C" + player.handSize()
+                + " " + visibleRole(player, viewerAccountId);
+        if (!player.connected()) {
+            text += " " + color("offline", RED);
+        }
+        if (player.eliminated()) {
+            text += " " + color("out", RED);
+        }
+        return selectedTarget ? BOLD + color("[" + text + "]", YELLOW) + RESET : text;
     }
 
     private static void appendHand(StringBuilder builder, PlayerState player, GameUiState uiState) {
-        builder.append("Your role: ").append(player.role())
-                .append(" | Character: ").append(player.character().name())
-                .append(" | HP: ").append(player.health()).append("/")
-                .append(player.maxHealth()).append("\r\n");
-        builder.append("Hand:\r\n");
+        builder.append(BOLD)
+                .append(color("Your hand", CYAN))
+                .append(RESET)
+                .append(" | Role: ")
+                .append(color(player.role().name(), MAGENTA))
+                .append(" | Character: ")
+                .append(color(player.character().name(), GREEN))
+                .append(" | HP ")
+                .append(healthBar(player))
+                .append("\r\n");
         for (int i = 0; i < player.hand().size(); i++) {
             CardInstance card = player.hand().get(i);
             boolean selected = uiState.focus() == GameFocus.HAND && i == uiState.selectedCard();
-            builder.append(selected ? BOLD + "[" : " ");
-            builder.append(i + 1).append(" ").append(card.name());
-            builder.append(selected ? "]" + RESET : "");
+            builder.append(selected ? BOLD + color("^", YELLOW) + " " : "  ");
+            builder.append(cardView(i + 1, card, selected));
             builder.append("  ");
         }
         builder.append("\r\n");
     }
 
+    private static void appendPending(StringBuilder builder, GameState state, UUID viewerAccountId, PendingAction pending) {
+        String response = pending.responseKind().name();
+        String expected = state.findPlayer(pending.expectedAccountId())
+                .map(PlayerState::nickname)
+                .orElse("Unknown player");
+        if (pending.expectedAccountId().equals(viewerAccountId)) {
+            if (pending.type() == PendingActionType.SHOT_REACTION) {
+                builder.append(BOLD)
+                        .append(color("You may answer with " + response + ".", YELLOW))
+                        .append(RESET)
+                        .append(" Enter to answer, Backspace to take damage.\r\n");
+            } else {
+                builder.append(BOLD)
+                        .append(color("You must answer with " + response + ".", YELLOW))
+                        .append(RESET)
+                        .append(" Enter to answer, Backspace to fail.\r\n");
+            }
+            return;
+        }
+        String action = pending.type() == PendingActionType.SHOT_REACTION ? "may answer with " : "must answer with ";
+        builder.append(color(expected, YELLOW))
+                .append(" ")
+                .append(action)
+                .append(response)
+                .append(". Auto-refresh enabled.\r\n");
+    }
+
     private static void appendTurnHint(StringBuilder builder, GameState state, UUID viewerAccountId, GameUiState uiState) {
         if (state.winner().isPresent()) {
-            builder.append("Winner: ").append(state.winner().orElseThrow()).append(". Press any key.\r\n");
+            builder.append("Winner: ").append(color(state.winner().orElseThrow().name(), GREEN)).append(". Press any key.\r\n");
             return;
         }
         if (!state.currentPlayer().accountId().equals(viewerAccountId)) {
-            builder.append("Waiting for ").append(state.currentPlayer().nickname()).append(". Auto-refresh enabled. [Q] exit session\r\n");
+            builder.append("Waiting for ").append(color(state.currentPlayer().nickname(), YELLOW)).append(". Auto-refresh enabled. [Q] exit session\r\n");
             return;
         }
         if (state.phase() == GamePhase.DISCARD) {
@@ -258,11 +348,67 @@ public final class TerminalRenderer {
         return "HIDDEN";
     }
 
+    private static String cardView(int number, CardInstance card, boolean selected) {
+        String text = "[" + number + " " + card.name() + "]";
+        String color = cardColor(card.kind());
+        return selected ? color(text, color) : color(text, color);
+    }
+
+    private static String healthBar(PlayerState player) {
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < player.maxHealth(); i++) {
+            builder.append(i < player.health() ? "*" : ".");
+        }
+        return color(builder.toString(), player.health() <= 1 ? RED : GREEN);
+    }
+
+    private static String cardColor(CardKind kind) {
+        return switch (kind) {
+            case SHOT, STANDOFF -> RED;
+            case DODGE -> BLUE;
+            case SALOON -> GREEN;
+            case TRAIL_RIDE -> CYAN;
+            case DISARM, RUSTLE -> YELLOW;
+        };
+    }
+
+    private static String phaseColor(GamePhase phase) {
+        return switch (phase) {
+            case PLAY -> GREEN;
+            case DISCARD -> YELLOW;
+            case FINISHED -> MAGENTA;
+        };
+    }
+
     private static String title(String text) {
-        return BOLD + text + RESET + "\r\n" + "=".repeat(Math.max(3, text.length())) + "\r\n\r\n";
+        return BOLD + color(text, CYAN) + RESET + "\r\n" + "=".repeat(Math.max(3, text.length())) + "\r\n\r\n";
     }
 
     private static String shortId(UUID id) {
         return id.toString().substring(0, 8);
+    }
+
+    private static String center(String text, int width) {
+        int visible = visibleLength(text);
+        if (visible >= width) {
+            return text;
+        }
+        return " ".repeat((width - visible) / 2) + text;
+    }
+
+    private static String fit(String text, int width) {
+        int visible = visibleLength(text);
+        if (visible >= width) {
+            return text;
+        }
+        return text + " ".repeat(width - visible);
+    }
+
+    private static int visibleLength(String text) {
+        return text.replaceAll("\u001B\\[[;\\d]*m", "").length();
+    }
+
+    private static String color(String text, String color) {
+        return color + text + RESET;
     }
 }
