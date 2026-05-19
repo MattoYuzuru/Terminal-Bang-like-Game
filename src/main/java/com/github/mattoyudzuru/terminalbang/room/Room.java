@@ -58,11 +58,11 @@ public final class Room {
     }
 
     void addSeat(Account account) {
-        if (status != RoomStatus.WAITING) {
-            throw new IllegalStateException("Cannot join a room that already started");
-        }
         if (contains(account.id())) {
             return;
+        }
+        if (status != RoomStatus.WAITING) {
+            throw new IllegalStateException("Cannot join a room that already started");
         }
         if (seats.size() >= 7) {
             throw new IllegalStateException("Room is full");
@@ -101,4 +101,3 @@ public final class Room {
         }
     }
 }
-

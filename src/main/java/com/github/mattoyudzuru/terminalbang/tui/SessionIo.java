@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.Optional;
 
 final class SessionIo {
     private final InputStream inputStream;
@@ -47,6 +49,22 @@ final class SessionIo {
         return TerminalKey.character(Character.toLowerCase(character));
     }
 
+    Optional<TerminalKey> readKey(Duration timeout) throws IOException {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        while (System.nanoTime() < deadline) {
+            if (inputStream.available() > 0) {
+                return Optional.of(readKey());
+            }
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new EOFException("SSH session interrupted");
+            }
+        }
+        return Optional.empty();
+    }
+
     String readLine(String prompt) throws IOException {
         write(prompt);
         StringBuilder builder = new StringBuilder();
@@ -84,4 +102,3 @@ final class SessionIo {
         };
     }
 }
-

@@ -17,10 +17,13 @@ import com.github.mattoyudzuru.terminalbang.user.Account;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
 public final class TerminalSession {
+    private static final Duration AUTO_REFRESH_INTERVAL = Duration.ofMillis(750);
+
     private final AccountRepository accountRepository;
     private final MatchResultRepository matchResultRepository;
     private final RoomService roomService;
@@ -147,6 +150,7 @@ public final class TerminalSession {
     private void runLobby(SessionIo io, Account account, Room room) throws IOException {
         Room currentRoom = room;
         while (true) {
+            currentRoom = roomService.room(currentRoom.code()).orElse(currentRoom);
             io.write(renderer.lobby(currentRoom, account));
             if (currentRoom.status() == RoomStatus.IN_GAME) {
                 Optional<GameEngine> activeGame = roomService.activeGame(account.id());
@@ -155,7 +159,11 @@ public final class TerminalSession {
                     return;
                 }
             }
-            TerminalKey key = io.readKey();
+            Optional<TerminalKey> maybeKey = io.readKey(AUTO_REFRESH_INTERVAL);
+            if (maybeKey.isEmpty()) {
+                continue;
+            }
+            TerminalKey key = maybeKey.orElseThrow();
             if (key.type() == TerminalKeyType.CTRL_C || key.isCharacter('q')) {
                 roomService.leaveWaitingRoom(account.id());
                 return;
@@ -172,7 +180,6 @@ public final class TerminalSession {
             } catch (RuntimeException exception) {
                 showMessage(io, "Room action failed", exception.getMessage());
             }
-            currentRoom = roomService.room(currentRoom.code()).orElse(currentRoom);
         }
     }
 
@@ -198,8 +205,13 @@ public final class TerminalSession {
             roomService.tick();
             GameState state = engine.state();
             clampSelection(state, account, uiState);
-            io.write(renderer.game(state, account.id(), uiState));
-            TerminalKey key = io.readKey();
+            io.write(renderer.game(state, account.id(), currentRoomCode(account), uiState));
+            Optional<TerminalKey> maybeKey = io.readKey(AUTO_REFRESH_INTERVAL);
+            if (maybeKey.isEmpty()) {
+                roomService.persistIfFinished(engine);
+                continue;
+            }
+            TerminalKey key = maybeKey.orElseThrow();
             if (key.type() == TerminalKeyType.CTRL_C || key.isCharacter('q')) {
                 return;
             }
@@ -255,10 +267,12 @@ public final class TerminalSession {
             uiState.setFocus(GameFocus.HAND);
             return;
         }
-        if (key.isCharacter('?') || key.isCharacter('/')) {
+        if (key.isCharacter('?') || key.isCharacter('/') || key.isCharacter('.')) {
             if (player.handSize() > 0) {
-                io.write(renderer.cardHelp(player.hand().get(uiState.selectedCard())));
-                io.readKey();
+                CardInstance card = player.hand().get(uiState.selectedCard());
+                uiState.setMessage(card.name() + ": " + card.definition().description());
+            } else {
+                uiState.setMessage("No card selected.");
             }
             return;
         }
@@ -337,6 +351,12 @@ public final class TerminalSession {
         io.readKey();
     }
 
+    private String currentRoomCode(Account account) {
+        return roomService.activeRoom(account.id())
+                .map(Room::code)
+                .orElse("UNKNOWN");
+    }
+
     private static String defaultNickname(String username) {
         if (username == null || username.isBlank()) {
             return "player";
@@ -344,4 +364,3 @@ public final class TerminalSession {
         return username;
     }
 }
-

@@ -128,16 +128,16 @@ public final class TerminalRenderer {
         if (room.status() == RoomStatus.WAITING && account.id().equals(room.hostAccountId())) {
             builder.append("[P] Toggle public/private  [S] Start  [K] Kick  [Q] Close room\r\n");
         } else if (room.status() == RoomStatus.WAITING) {
-            builder.append("[R] Refresh  [Q] Leave room\r\n");
+            builder.append("Waiting for host. Auto-refresh enabled. [Q] Leave room\r\n");
         } else {
-            builder.append("Game is starting. Press any key.\r\n");
+            builder.append("Game is starting. Auto-refresh enabled.\r\n");
         }
         return builder.toString();
     }
 
-    public String game(GameState state, UUID viewerAccountId, GameUiState uiState) {
+    public String game(GameState state, UUID viewerAccountId, String roomCode, GameUiState uiState) {
         StringBuilder builder = new StringBuilder(CLEAR)
-                .append(title("Match " + shortId(state.id())))
+                .append(title("Room " + roomCode + " | Match " + shortId(state.id())))
                 .append("Deck: ")
                 .append(state.drawPileSize())
                 .append(" | Discard: ")
@@ -231,17 +231,17 @@ public final class TerminalRenderer {
             return;
         }
         if (!state.currentPlayer().accountId().equals(viewerAccountId)) {
-            builder.append("Waiting for ").append(state.currentPlayer().nickname()).append(". [Q] exit session\r\n");
+            builder.append("Waiting for ").append(state.currentPlayer().nickname()).append(". Auto-refresh enabled. [Q] exit session\r\n");
             return;
         }
         if (state.phase() == GamePhase.DISCARD) {
-            builder.append("Discard down to health. ←/→ or 1-9 select, Enter discard, ? help.\r\n");
+            builder.append("Discard down to health. ←/→ or 1-9 select, Enter discard, ?, /, or . for help.\r\n");
             return;
         }
         if (uiState.focus() == GameFocus.TARGET) {
             builder.append("Select target: ←/→ move, Enter confirm, Backspace cancel.\r\n");
         } else {
-            builder.append("←/→ or 1-9 select card, Enter play, ? help, E end turn, Q exit session.\r\n");
+            builder.append("←/→ or 1-9 select card, Enter play, ?, /, or . for help, E end turn, Q exit session.\r\n");
         }
     }
 
@@ -266,4 +266,3 @@ public final class TerminalRenderer {
         return id.toString().substring(0, 8);
     }
 }
-
