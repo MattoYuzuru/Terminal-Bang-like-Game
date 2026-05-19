@@ -1,6 +1,7 @@
 package com.github.mattoyudzuru.terminalbang.tui;
 
 import com.github.mattoyudzuru.terminalbang.game.CardInstance;
+import com.github.mattoyudzuru.terminalbang.game.CardKind;
 import com.github.mattoyudzuru.terminalbang.game.GameEngine;
 import com.github.mattoyudzuru.terminalbang.game.GamePhase;
 import com.github.mattoyudzuru.terminalbang.game.GameState;
@@ -296,12 +297,12 @@ public final class TerminalSession {
 
     private void playSelectedCard(GameState state, GameEngine engine, Account account, GameUiState uiState, PlayerState player) {
         CardInstance card = player.hand().get(uiState.selectedCard());
-        if (card.definition().requiresTarget() && uiState.focus() == GameFocus.HAND) {
+        if (requiresTargetForUi(player, card) && uiState.focus() == GameFocus.HAND) {
             uiState.setFocus(GameFocus.TARGET);
             return;
         }
         Optional<java.util.UUID> target = Optional.empty();
-        if (card.definition().requiresTarget()) {
+        if (requiresTargetForUi(player, card)) {
             List<PlayerState> targets = TerminalRenderer.targets(state, account.id());
             if (targets.isEmpty()) {
                 throw new IllegalStateException("No valid targets");
@@ -311,6 +312,11 @@ public final class TerminalSession {
         engine.playCard(account.id(), uiState.selectedCard(), target);
         uiState.setFocus(GameFocus.HAND);
         uiState.setSelectedCard(Math.max(0, uiState.selectedCard() - 1));
+    }
+
+    private static boolean requiresTargetForUi(PlayerState player, CardInstance card) {
+        return card.definition().requiresTarget()
+                || (card.kind() == CardKind.MISSED && player.character().id().equals("calamity_janet"));
     }
 
     private static void moveSelection(GameState state, Account account, GameUiState uiState, int delta) {

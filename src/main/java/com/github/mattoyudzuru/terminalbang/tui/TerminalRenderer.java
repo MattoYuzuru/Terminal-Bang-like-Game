@@ -257,6 +257,7 @@ public final class TerminalRenderer {
                 + nickname
                 + " HP " + healthBar(player)
                 + " C" + player.handSize()
+                + " T" + player.inPlaySize()
                 + " " + visibleRole(player, viewerAccountId);
         if (!player.connected()) {
             text += " " + color("offline", RED);
@@ -278,6 +279,16 @@ public final class TerminalRenderer {
                 .append(" | HP ")
                 .append(healthBar(player))
                 .append("\r\n");
+        builder.append("Ability: ")
+                .append(player.character().description())
+                .append("\r\n");
+        if (!player.inPlay().isEmpty()) {
+            builder.append("In play: ");
+            for (CardInstance card : player.inPlay()) {
+                builder.append(color(card.name() + "(" + card.code() + ")", cardColor(card.kind()))).append("  ");
+            }
+            builder.append("\r\n");
+        }
         for (int i = 0; i < player.hand().size(); i++) {
             CardInstance card = player.hand().get(i);
             boolean selected = uiState.focus() == GameFocus.HAND && i == uiState.selectedCard();
@@ -289,12 +300,12 @@ public final class TerminalRenderer {
     }
 
     private static void appendPending(StringBuilder builder, GameState state, UUID viewerAccountId, PendingAction pending) {
-        String response = pending.responseKind().name();
+        String response = StandardNames.cardName(pending.responseKind());
         String expected = state.findPlayer(pending.expectedAccountId())
                 .map(PlayerState::nickname)
                 .orElse("Unknown player");
         if (pending.expectedAccountId().equals(viewerAccountId)) {
-            if (pending.type() == PendingActionType.SHOT_REACTION) {
+            if (pending.type() == PendingActionType.BANG_REACTION) {
                 builder.append(BOLD)
                         .append(color("You may answer with " + response + ".", YELLOW))
                         .append(RESET)
@@ -307,7 +318,7 @@ public final class TerminalRenderer {
             }
             return;
         }
-        String action = pending.type() == PendingActionType.SHOT_REACTION ? "may answer with " : "must answer with ";
+        String action = pending.type() == PendingActionType.BANG_REACTION ? "may answer with " : "must answer with ";
         builder.append(color(expected, YELLOW))
                 .append(" ")
                 .append(action)
@@ -349,7 +360,7 @@ public final class TerminalRenderer {
     }
 
     private static String cardView(int number, CardInstance card, boolean selected) {
-        String text = "[" + number + " " + card.name() + "]";
+        String text = "[" + number + " " + card.name() + " " + card.code() + "]";
         String color = cardColor(card.kind());
         return selected ? color(text, color) : color(text, color);
     }
@@ -364,11 +375,12 @@ public final class TerminalRenderer {
 
     private static String cardColor(CardKind kind) {
         return switch (kind) {
-            case SHOT, STANDOFF -> RED;
-            case DODGE -> BLUE;
-            case SALOON -> GREEN;
-            case TRAIL_RIDE -> CYAN;
-            case DISARM, RUSTLE -> YELLOW;
+            case BANG, DUEL, GATLING, INDIANS -> RED;
+            case MISSED, BARREL, JAIL, DYNAMITE -> BLUE;
+            case BEER, SALOON -> GREEN;
+            case STAGECOACH, WELLS_FARGO, GENERAL_STORE -> CYAN;
+            case CAT_BALOU, PANIC -> YELLOW;
+            case MUSTANG, SCOPE, REMINGTON, REV_CARABINE, SCHOFIELD, VOLCANIC, WINCHESTER -> MAGENTA;
         };
     }
 
@@ -410,5 +422,18 @@ public final class TerminalRenderer {
 
     private static String color(String text, String color) {
         return color + text + RESET;
+    }
+
+    private static final class StandardNames {
+        private StandardNames() {
+        }
+
+        private static String cardName(CardKind kind) {
+            return switch (kind) {
+                case BANG -> "Bang";
+                case MISSED -> "Missed";
+                default -> kind.name();
+            };
+        }
     }
 }

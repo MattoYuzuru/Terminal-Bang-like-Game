@@ -11,6 +11,8 @@
 - Ход игрока: draw phase, play phase, discard phase.
 - Лимит руки в конце хода равен текущему количеству жизней.
 - Расстояние между игроками считается по кругу и влияет на часть карт.
+- Колода базовой игры фиксированная: 80 карт с конкретными количествами, мастями и рангами.
+- Blue/weapon cards лежат перед игроком; weapon range не меняет distance, а только максимальную дальность Bang.
 - Приложение пишется на Java, но без HTTP-first архитектуры.
 - Spring Boot не нужен для MVP; его можно добавить позже только ради DI/config/metrics, с `web-application-type=none`.
 - PostgreSQL используется для постоянных данных. Активная игра в MVP хранится в памяти процесса.
@@ -88,8 +90,10 @@ TB_DB_POOL_SIZE   default 8
 - Public rooms catalog.
 - Host controls: public/private toggle, start, kick, close room.
 - Game engine: 4-7 игроков, роли, стартовый Sheriff, ходы, рука, колода, сброс.
-- Базовые карты: Shot, Dodge, Saloon, Trail Ride, Disarm, Rustle, Standoff.
-- Target selection, pending reactions, discard phase.
+- Базовая колода на 80 карт: Bang, Missed, Beer, Cat Balou, Duel, Gatling, General Store, Indians, Panic, Saloon, Stagecoach, Wells Fargo, Barrel, Dynamite, Jail, Mustang, Scope и все weapons.
+- 16 базовых персонажей и их способности: Bart Cassidy, Black Jack, Calamity Janet, El Gringo, Jesse Jones, Jourdonnais, Kit Carlson, Lucky Duke, Paul Regret, Pedro Ramirez, Rose Doolan, Sid Ketchum, Slab the Killer, Suzy Lafayette, Vulture Sam, Willy the Kid.
+- Target selection, pending reactions, mass reactions, discard phase.
+- Edge cases: Beer lethal-save, Beer off with two alive, one Bang per turn, Volcanic/Willy exceptions, Slab two-Missed rule, Jail not on Sheriff, Dynamite before Jail, Barrel/Jourdonnais draw!, Mustang/Scope distance modifiers, Outlaw reward, Sheriff penalty for killing Deputy, Vulture Sam card pickup.
 - Disconnect/reconnect state, timeout skip, abandoned match.
 - Match stats persistence.
 - Unit tests для engine, rooms и renderer.
@@ -98,9 +102,41 @@ TB_DB_POOL_SIZE   default 8
 
 - TUI пока простой ANSI-интерфейс, не финальный красивый веер карт.
 - Resize определяется по начальному `COLUMNS/LINES`; live resize через WINCH ещё не реализован.
-- Нет полного набора карт, персонажных способностей, оружия и модификаторов дистанции.
+- General Store, Jesse Jones и Kit Carlson в MVP выбирают карты автоматически, потому что интерактивный выбор для этих эффектов ещё не вынесен в отдельный pending-screen.
 - Нет AI/bot игроков; для матча нужны реальные SSH-сессии.
 - Нет рейтинга, spectator mode и чата.
+
+## Правила MVP
+
+Внутренняя модель сверена с официальными материалами:
+
+- правила Fourth edition: `https://bang.dvgiochi.com/content/1/docs/01_bang_rules_EN.pdf`;
+- официальный список карт: `https://bang.dvgames.com/cardslist.php?id=1&lang=en`.
+
+В публичном UI используются краткие пересказы эффектов. Оригинальные арты, логотипы и длинные тексты правил не копируются.
+
+Колода:
+
+```text
+Brown/reaction: Bang x25, Missed x12, Beer x6, Cat Balou x4, Duel x3,
+Gatling x1, General Store x2, Indians x2, Panic x4, Saloon x1,
+Stagecoach x2, Wells Fargo x1.
+
+Blue/weapon: Barrel x2, Dynamite x1, Jail x3, Mustang x2, Scope x1,
+Volcanic x2, Schofield x3, Remington x1, Rev. Carabine x1, Winchester x1.
+```
+
+Порядок turn start:
+
+```text
+1. Dynamite draw! check, если карта лежит перед игроком.
+2. Jail draw! check, если игрок в Jail.
+3. Draw phase с учетом способности персонажа.
+4. Play phase.
+5. Discard до текущего HP.
+```
+
+Игрок видит свою роль, персонажа, HP, карты в руке, карты in-play и строку `Ability` с описанием способности персонажа.
 
 ## Управление
 

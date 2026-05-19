@@ -1,5 +1,6 @@
 package com.github.mattoyudzuru.terminalbang.game;
 
+import java.util.List;
 import java.util.UUID;
 
 public record PendingAction(
@@ -7,26 +8,51 @@ public record PendingAction(
         UUID expectedAccountId,
         UUID opponentAccountId,
         CardKind responseKind,
+        int requiredResponses,
+        List<UUID> remainingAccountIds,
         String prompt
 ) {
-    public static PendingAction shotReaction(UUID expectedAccountId, UUID attackerAccountId, String prompt) {
+    public PendingAction {
+        remainingAccountIds = List.copyOf(remainingAccountIds);
+    }
+
+    public static PendingAction bangReaction(
+            UUID expectedAccountId,
+            UUID attackerAccountId,
+            int requiredResponses,
+            String prompt
+    ) {
         return new PendingAction(
-                PendingActionType.SHOT_REACTION,
+                PendingActionType.BANG_REACTION,
                 expectedAccountId,
                 attackerAccountId,
-                CardKind.DODGE,
+                CardKind.MISSED,
+                requiredResponses,
+                List.of(),
                 prompt
         );
     }
 
-    public static PendingAction standoffResponse(UUID expectedAccountId, UUID opponentAccountId, String prompt) {
+    public static PendingAction duelResponse(UUID expectedAccountId, UUID opponentAccountId, String prompt) {
         return new PendingAction(
-                PendingActionType.STANDOFF_RESPONSE,
+                PendingActionType.DUEL_RESPONSE,
                 expectedAccountId,
                 opponentAccountId,
-                CardKind.SHOT,
+                CardKind.BANG,
+                1,
+                List.of(),
                 prompt
         );
     }
-}
 
+    public static PendingAction massReaction(
+            PendingActionType type,
+            UUID expectedAccountId,
+            UUID attackerAccountId,
+            CardKind responseKind,
+            List<UUID> remainingAccountIds,
+            String prompt
+    ) {
+        return new PendingAction(type, expectedAccountId, attackerAccountId, responseKind, 1, remainingAccountIds, prompt);
+    }
+}

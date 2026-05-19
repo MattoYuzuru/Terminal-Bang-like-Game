@@ -15,7 +15,11 @@ public final class DistanceCalculator {
         int to = indexOf(alive, toAccountId);
         int clockwise = Math.abs(from - to);
         int counterClockwise = alive.size() - clockwise;
-        return Math.min(clockwise, counterClockwise);
+        int baseDistance = Math.min(clockwise, counterClockwise);
+        PlayerState fromPlayer = alive.get(from);
+        PlayerState toPlayer = alive.get(to);
+        int modified = baseDistance + fromPlayer.outgoingDistanceModifier() + toPlayer.incomingDistanceModifier();
+        return Math.max(1, modified);
     }
 
     private static int indexOf(List<PlayerState> players, UUID accountId) {
@@ -27,4 +31,3 @@ public final class DistanceCalculator {
         throw new IllegalArgumentException("Unknown or eliminated player: " + accountId);
     }
 }
-

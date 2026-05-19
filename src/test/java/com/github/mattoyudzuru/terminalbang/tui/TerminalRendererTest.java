@@ -123,19 +123,25 @@ class TerminalRendererTest {
             );
             PlayerState actor = engine.state().currentPlayer();
             Optional<Integer> maybeCardIndex = java.util.stream.IntStream.range(0, actor.handSize())
-                    .filter(index -> actor.hand().get(index).kind() == CardKind.SHOT
-                            || actor.hand().get(index).kind() == CardKind.STANDOFF)
+                    .filter(index -> actor.hand().get(index).kind() == CardKind.BANG
+                            || actor.hand().get(index).kind() == CardKind.DUEL)
                     .boxed()
                     .findFirst();
             if (maybeCardIndex.isEmpty()) {
                 continue;
             }
-            PlayerState target = TerminalRenderer.targets(engine.state(), actor.accountId()).getFirst();
+            PlayerState target = adjacentTarget(engine.state());
             engine.playCard(actor.accountId(), maybeCardIndex.orElseThrow(), Optional.of(target.accountId()));
             if (engine.state().pendingAction().isPresent()) {
                 return engine;
             }
         }
         throw new IllegalStateException("Could not create a pending-action game");
+    }
+
+    private static PlayerState adjacentTarget(GameState state) {
+        List<PlayerState> players = state.players();
+        int current = state.currentPlayerIndex();
+        return players.get((current + 1) % players.size());
     }
 }

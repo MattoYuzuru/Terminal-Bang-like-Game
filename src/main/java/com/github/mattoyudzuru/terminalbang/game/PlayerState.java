@@ -13,6 +13,7 @@ public final class PlayerState {
     private final CharacterDefinition character;
     private final int maxHealth;
     private final List<CardInstance> hand = new ArrayList<>();
+    private final List<CardInstance> inPlay = new ArrayList<>();
 
     private int health;
     private boolean connected = true;
@@ -21,6 +22,7 @@ public final class PlayerState {
     private int damageDealt;
     private int damageTaken;
     private int cardsPlayed;
+    private int bangCardsPlayedThisTurn;
 
     PlayerState(UUID accountId, String nickname, Role role, CharacterDefinition character, int maxHealth) {
         this.accountId = accountId;
@@ -71,8 +73,16 @@ public final class PlayerState {
         return List.copyOf(hand);
     }
 
+    public List<CardInstance> inPlay() {
+        return List.copyOf(inPlay);
+    }
+
     public int handSize() {
         return hand.size();
+    }
+
+    public int inPlaySize() {
+        return inPlay.size();
     }
 
     public int damageDealt() {
@@ -114,6 +124,44 @@ public final class PlayerState {
         return Optional.empty();
     }
 
+    boolean hasInPlay(CardKind kind) {
+        return inPlay.stream().anyMatch(card -> card.kind() == kind);
+    }
+
+    void addInPlay(CardInstance card) {
+        inPlay.add(card);
+    }
+
+    Optional<CardInstance> removeInPlay(CardKind kind) {
+        for (int i = 0; i < inPlay.size(); i++) {
+            if (inPlay.get(i).kind() == kind) {
+                return Optional.of(inPlay.remove(i));
+            }
+        }
+        return Optional.empty();
+    }
+
+    Optional<CardInstance> removeWeaponInPlay() {
+        for (int i = 0; i < inPlay.size(); i++) {
+            if (isWeapon(inPlay.get(i).kind())) {
+                return Optional.of(inPlay.remove(i));
+            }
+        }
+        return Optional.empty();
+    }
+
+    Optional<CardInstance> removeRandomVisibleCard(RandomSource random) {
+        int total = hand.size() + inPlay.size();
+        if (total == 0) {
+            return Optional.empty();
+        }
+        int index = random.nextInt(total);
+        if (index < hand.size()) {
+            return Optional.of(hand.remove(index));
+        }
+        return Optional.of(inPlay.remove(index - hand.size()));
+    }
+
     Optional<CardInstance> removeRandomCard(RandomSource random) {
         if (hand.isEmpty()) {
             return Optional.empty();
@@ -136,6 +184,15 @@ public final class PlayerState {
         health = 0;
     }
 
+    List<CardInstance> removeAllCards() {
+        List<CardInstance> cards = new ArrayList<>(hand.size() + inPlay.size());
+        cards.addAll(hand);
+        cards.addAll(inPlay);
+        hand.clear();
+        inPlay.clear();
+        return cards;
+    }
+
     void disconnect(Instant at) {
         connected = false;
         disconnectedAt = Optional.of(at);
@@ -155,5 +212,60 @@ public final class PlayerState {
     void recordCardPlayed() {
         cardsPlayed++;
     }
-}
 
+    void recordBangCardPlayed() {
+        bangCardsPlayedThisTurn++;
+    }
+
+    void resetTurnFlags() {
+        bangCardsPlayedThisTurn = 0;
+    }
+
+    boolean canPlayBangCard() {
+        return bangCardsPlayedThisTurn == 0
+                || hasInPlay(CardKind.VOLCANIC)
+                || character.id().equals("willy_the_kid");
+    }
+
+    int weaponRange() {
+        return inPlay.stream()
+                .filter(card -> isWeapon(card.kind()))
+                .mapToInt(card -> weaponRange(card.kind()))
+                .findFirst()
+                .orElse(1);
+    }
+
+    int outgoingDistanceModifier() {
+        int modifier = hasInPlay(CardKind.SCOPE) ? -1 : 0;
+        if (character.id().equals("rose_doolan")) {
+            modifier--;
+        }
+        return modifier;
+    }
+
+    int incomingDistanceModifier() {
+        int modifier = hasInPlay(CardKind.MUSTANG) ? 1 : 0;
+        if (character.id().equals("paul_regret")) {
+            modifier++;
+        }
+        return modifier;
+    }
+
+    static boolean isWeapon(CardKind kind) {
+        return switch (kind) {
+            case REMINGTON, REV_CARABINE, SCHOFIELD, VOLCANIC, WINCHESTER -> true;
+            default -> false;
+        };
+    }
+
+    private static int weaponRange(CardKind kind) {
+        return switch (kind) {
+            case SCHOFIELD -> 2;
+            case REMINGTON -> 3;
+            case REV_CARABINE -> 4;
+            case WINCHESTER -> 5;
+            case VOLCANIC -> 1;
+            default -> 1;
+        };
+    }
+}
