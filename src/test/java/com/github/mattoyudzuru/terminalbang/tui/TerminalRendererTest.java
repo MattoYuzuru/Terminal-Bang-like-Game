@@ -60,6 +60,32 @@ class TerminalRendererTest {
     }
 
     @Test
+    void rendersRussianSettingsAndGameTermsForRussianAccount() {
+        Instant now = Instant.parse("2026-05-19T10:00:00Z");
+        List<PlayerSeed> seats = java.util.stream.IntStream.rangeClosed(1, 4)
+                .mapToObj(index -> new PlayerSeed(UUID.randomUUID(), "P" + index))
+                .toList();
+        GameEngine engine = GameEngine.start(
+                UUID.randomUUID(),
+                seats,
+                RandomSource.seeded(1),
+                Clock.fixed(now, ZoneOffset.UTC)
+        );
+        PlayerState viewer = engine.state().currentPlayer();
+        Account account = new Account(viewer.accountId(), "fp", viewer.nickname(), "ru", now, now);
+        TerminalRenderer renderer = new TerminalRenderer();
+
+        String settings = renderer.settings(account);
+        String game = renderer.game(engine.state(), account, "ABCDE", new GameUiState());
+
+        assertTrue(settings.contains("Настройки"));
+        assertTrue(settings.contains("Язык: Русский"));
+        assertTrue(game.contains("Комната ABCDE"));
+        assertTrue(game.contains("Ваша рука"));
+        assertTrue(game.contains("Способность"));
+    }
+
+    @Test
     void lobbyShowsAutoRefreshForGuests() {
         Instant now = Instant.parse("2026-05-19T10:00:00Z");
         Account host = new Account(UUID.randomUUID(), "host-fp", "Host", now, now);

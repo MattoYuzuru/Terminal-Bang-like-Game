@@ -25,7 +25,7 @@ public final class JdbcAccountRepository implements AccountRepository {
     @Override
     public Optional<Account> findById(UUID accountId) {
         String sql = """
-                SELECT id, ssh_fingerprint, nickname, created_at, updated_at
+                SELECT id, ssh_fingerprint, nickname, language, created_at, updated_at
                 FROM accounts
                 WHERE id = ?
                 """;
@@ -49,7 +49,7 @@ public final class JdbcAccountRepository implements AccountRepository {
                 UPDATE accounts
                 SET nickname = ?, updated_at = now()
                 WHERE id = ?
-                RETURNING id, ssh_fingerprint, nickname, created_at, updated_at
+                RETURNING id, ssh_fingerprint, nickname, language, created_at, updated_at
                 """;
         try (var connection = dataSource.getConnection();
              var statement = connection.prepareStatement(sql)) {
@@ -66,9 +66,33 @@ public final class JdbcAccountRepository implements AccountRepository {
         }
     }
 
+    @Override
+    public Account updateLanguage(UUID accountId, String language) {
+        String normalized = normalizeLanguage(language);
+        String sql = """
+                UPDATE accounts
+                SET language = ?, updated_at = now()
+                WHERE id = ?
+                RETURNING id, ssh_fingerprint, nickname, language, created_at, updated_at
+                """;
+        try (var connection = dataSource.getConnection();
+             var statement = connection.prepareStatement(sql)) {
+            statement.setString(1, normalized);
+            statement.setObject(2, accountId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return map(resultSet);
+                }
+                throw new PersistenceException("Account does not exist: " + accountId);
+            }
+        } catch (SQLException exception) {
+            throw new PersistenceException("Failed to update account language", exception);
+        }
+    }
+
     private Optional<Account> findByFingerprint(String sshFingerprint) {
         String sql = """
-                SELECT id, ssh_fingerprint, nickname, created_at, updated_at
+                SELECT id, ssh_fingerprint, nickname, language, created_at, updated_at
                 FROM accounts
                 WHERE ssh_fingerprint = ?
                 """;
@@ -88,9 +112,9 @@ public final class JdbcAccountRepository implements AccountRepository {
 
     private Account insert(String sshFingerprint, String nickname) {
         String sql = """
-                INSERT INTO accounts (id, ssh_fingerprint, nickname)
-                VALUES (?, ?, ?)
-                RETURNING id, ssh_fingerprint, nickname, created_at, updated_at
+                INSERT INTO accounts (id, ssh_fingerprint, nickname, language)
+                VALUES (?, ?, ?, 'en')
+                RETURNING id, ssh_fingerprint, nickname, language, created_at, updated_at
                 """;
         try (var connection = dataSource.getConnection();
              var statement = connection.prepareStatement(sql)) {
@@ -115,9 +139,14 @@ public final class JdbcAccountRepository implements AccountRepository {
                 resultSet.getObject("id", UUID.class),
                 resultSet.getString("ssh_fingerprint"),
                 resultSet.getString("nickname"),
+                resultSet.getString("language"),
                 toInstant(resultSet, "created_at"),
                 toInstant(resultSet, "updated_at")
         );
+    }
+
+    private static String normalizeLanguage(String language) {
+        return "ru".equalsIgnoreCase(language) ? "ru" : "en";
     }
 
     private static Instant toInstant(ResultSet resultSet, String column) throws SQLException {
@@ -125,4 +154,3 @@ public final class JdbcAccountRepository implements AccountRepository {
         return timestamp.toInstant();
     }
 }
-

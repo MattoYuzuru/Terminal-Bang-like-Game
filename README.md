@@ -85,7 +85,8 @@ TB_DB_POOL_SIZE   default 8
 - SSH server на Apache MINA SSHD.
 - Public key auth по SSH fingerprint.
 - Account/profile по fingerprint.
-- Главное меню, профиль, settings nickname, leaderboard.
+- Главное меню, профиль, settings nickname/language, leaderboard.
+- Переключение языка интерфейса: English / Русский. Выбор хранится в профиле аккаунта.
 - Create/join private room по 5-буквенному коду.
 - Public rooms catalog.
 - Host controls: public/private toggle, start, kick, close room.

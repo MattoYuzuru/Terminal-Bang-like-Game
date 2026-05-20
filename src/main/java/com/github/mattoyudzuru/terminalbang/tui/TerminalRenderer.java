@@ -28,43 +28,59 @@ public final class TerminalRenderer {
     private static final String BLUE = "\u001B[34m";
     private static final String MAGENTA = "\u001B[35m";
     private static final String CYAN = "\u001B[36m";
-    private static final String WHITE = "\u001B[37m";
     private static final String RESET = "\u001B[0m";
 
     public String resizeWarning(TerminalSize size) {
+        return resizeWarning(size, "en");
+    }
+
+    public String resizeWarning(TerminalSize size, Account account) {
+        return resizeWarning(size, I18n.lang(account));
+    }
+
+    private String resizeWarning(TerminalSize size, String language) {
         return CLEAR
-                + "Terminal is too small.\r\n\r\n"
-                + "Minimum size: " + TerminalSize.MIN_COLUMNS + "x" + TerminalSize.MIN_ROWS + "\r\n"
-                + "Current size: " + size.columns() + "x" + size.rows() + "\r\n\r\n"
-                + "Resize the window and reconnect, or press Q to exit.\r\n";
+                + I18n.t(language, "Terminal is too small.", "Терминал слишком маленький.") + "\r\n\r\n"
+                + I18n.t(language, "Minimum size: ", "Минимальный размер: ")
+                + TerminalSize.MIN_COLUMNS + "x" + TerminalSize.MIN_ROWS + "\r\n"
+                + I18n.t(language, "Current size: ", "Текущий размер: ")
+                + size.columns() + "x" + size.rows() + "\r\n\r\n"
+                + I18n.t(language,
+                "Resize the window and reconnect, or press Q to exit.",
+                "Измените размер окна и переподключитесь или нажмите Q для выхода.")
+                + "\r\n";
     }
 
     public String mainMenu(Account account) {
+        String language = I18n.lang(account);
         return CLEAR
-                + title("Terminal Western Card Game")
-                + "Signed in as: " + account.nickname() + "\r\n\r\n"
-                + "[1] Play\r\n"
-                + "[2] Profile\r\n"
-                + "[3] Leaderboard\r\n"
-                + "[4] Settings\r\n"
-                + "[Q] Exit\r\n";
+                + title(I18n.t(language, "Terminal Western Card Game", "Терминальная вестерн-игра"), language)
+                + I18n.t(language, "Signed in as: ", "Вы вошли как: ") + account.nickname() + "\r\n\r\n"
+                + "[1] " + I18n.t(language, "Play", "Играть") + "\r\n"
+                + "[2] " + I18n.t(language, "Profile", "Профиль") + "\r\n"
+                + "[3] " + I18n.t(language, "Leaderboard", "Лидерборд") + "\r\n"
+                + "[4] " + I18n.t(language, "Settings", "Настройки") + "\r\n"
+                + "[Q] " + I18n.t(language, "Exit", "Выход") + "\r\n";
     }
 
-    public String playMenu(List<Room> publicRooms) {
+    public String playMenu(Account account, List<Room> publicRooms) {
+        String language = I18n.lang(account);
         StringBuilder builder = new StringBuilder(CLEAR)
-                .append(title("Play"))
-                .append("[1] Create private room\r\n")
-                .append("[2] Join public room\r\n")
-                .append("[3] Join private room by code\r\n")
-                .append("[B] Back\r\n\r\n");
-        builder.append("Public rooms: ").append(publicRooms.size()).append("\r\n");
+                .append(title(I18n.t(language, "Play", "Играть"), language))
+                .append("[1] ").append(I18n.t(language, "Create private room", "Создать приватную комнату")).append("\r\n")
+                .append("[2] ").append(I18n.t(language, "Join public room", "Войти в публичную комнату")).append("\r\n")
+                .append("[3] ").append(I18n.t(language, "Join private room by code", "Войти в приватную комнату по коду")).append("\r\n")
+                .append("[B] ").append(I18n.t(language, "Back", "Назад")).append("\r\n\r\n");
+        builder.append(I18n.t(language, "Public rooms: ", "Публичных комнат: ")).append(publicRooms.size()).append("\r\n");
         return builder.toString();
     }
 
-    public String publicRooms(List<Room> rooms) {
-        StringBuilder builder = new StringBuilder(CLEAR).append(title("Public Rooms"));
+    public String publicRooms(Account account, List<Room> rooms) {
+        String language = I18n.lang(account);
+        StringBuilder builder = new StringBuilder(CLEAR)
+                .append(title(I18n.t(language, "Public Rooms", "Публичные комнаты"), language));
         if (rooms.isEmpty()) {
-            builder.append("No public rooms yet.\r\n\r\n");
+            builder.append(I18n.t(language, "No public rooms yet.", "Публичных комнат пока нет.")).append("\r\n\r\n");
         } else {
             for (int i = 0; i < rooms.size() && i < 9; i++) {
                 Room room = rooms.get(i);
@@ -72,54 +88,60 @@ public final class TerminalRenderer {
                         .append(i + 1)
                         .append("] ")
                         .append(room.code())
-                        .append(" host=")
+                        .append(I18n.t(language, " host=", " хост="))
                         .append(room.seats().getFirst().nickname())
-                        .append(" players=")
+                        .append(I18n.t(language, " players=", " игроки="))
                         .append(room.seats().size())
                         .append("/7\r\n");
             }
             builder.append("\r\n");
         }
-        builder.append("[B] Back\r\n");
+        builder.append("[B] ").append(I18n.t(language, "Back", "Назад")).append("\r\n");
         return builder.toString();
     }
 
     public String profile(Account account) {
+        String language = I18n.lang(account);
         return CLEAR
-                + title("Profile")
-                + "Nickname: " + account.nickname() + "\r\n"
-                + "SSH key: " + account.sshFingerprint() + "\r\n\r\n"
-                + "Press any key to return.\r\n";
+                + title(I18n.t(language, "Profile", "Профиль"), language)
+                + I18n.t(language, "Nickname: ", "Ник: ") + account.nickname() + "\r\n"
+                + I18n.t(language, "Language: ", "Язык: ") + I18n.languageName(language) + "\r\n"
+                + I18n.t(language, "SSH key: ", "SSH ключ: ") + account.sshFingerprint() + "\r\n\r\n"
+                + I18n.t(language, "Press any key to return.", "Нажмите любую клавишу, чтобы вернуться.") + "\r\n";
     }
 
-    public String leaderboard(List<LeaderboardEntry> entries) {
-        StringBuilder builder = new StringBuilder(CLEAR).append(title("Leaderboard"));
+    public String leaderboard(Account account, List<LeaderboardEntry> entries) {
+        String language = I18n.lang(account);
+        StringBuilder builder = new StringBuilder(CLEAR)
+                .append(title(I18n.t(language, "Leaderboard", "Лидерборд"), language));
         if (entries.isEmpty()) {
-            builder.append("No completed matches yet.\r\n");
+            builder.append(I18n.t(language, "No completed matches yet.", "Завершённых матчей пока нет.")).append("\r\n");
         } else {
             for (int i = 0; i < entries.size(); i++) {
                 LeaderboardEntry entry = entries.get(i);
                 builder.append(i + 1)
                         .append(". ")
                         .append(entry.nickname())
-                        .append(" wins=")
+                        .append(I18n.t(language, " wins=", " побед="))
                         .append(entry.wins())
-                        .append(" matches=")
+                        .append(I18n.t(language, " matches=", " матчей="))
                         .append(entry.matches())
                         .append("\r\n");
             }
         }
-        builder.append("\r\nPress any key to return.\r\n");
+        builder.append("\r\n").append(I18n.t(language, "Press any key to return.", "Нажмите любую клавишу, чтобы вернуться.")).append("\r\n");
         return builder.toString();
     }
 
     public String lobby(Room room, Account account) {
+        String language = I18n.lang(account);
         StringBuilder builder = new StringBuilder(CLEAR)
-                .append(title("Room " + room.code() + " | You: " + account.nickname()))
-                .append("Visibility: ")
-                .append(room.visibility())
-                .append(" | Status: ")
-                .append(room.status())
+                .append(title(I18n.t(language, "Room ", "Комната ") + room.code() + " | "
+                        + I18n.t(language, "You: ", "Вы: ") + account.nickname(), language))
+                .append(I18n.t(language, "Visibility: ", "Видимость: "))
+                .append(roomVisibility(language, room.visibility()))
+                .append(I18n.t(language, " | Status: ", " | Статус: "))
+                .append(roomStatus(language, room.status()))
                 .append("\r\n\r\n");
         for (int i = 0; i < room.seats().size(); i++) {
             Account seat = room.seats().get(i);
@@ -127,77 +149,117 @@ public final class TerminalRenderer {
                     .append(". ")
                     .append(seat.nickname());
             if (seat.id().equals(room.hostAccountId())) {
-                builder.append(" [host]");
+                builder.append(I18n.t(language, " [host]", " [хост]"));
             }
             if (seat.id().equals(account.id())) {
-                builder.append(" [you]");
+                builder.append(I18n.t(language, " [you]", " [вы]"));
             }
             builder.append("\r\n");
         }
         builder.append("\r\n");
         if (room.status() == RoomStatus.WAITING && account.id().equals(room.hostAccountId())) {
-            builder.append("[P] Toggle public/private  [S] Start  [K] Kick  [Q] Close room\r\n");
+            builder.append("[P] ").append(I18n.t(language, "Toggle public/private", "Переключить public/private"))
+                    .append("  [S] ").append(I18n.t(language, "Start", "Старт"))
+                    .append("  [K] ").append(I18n.t(language, "Kick", "Кик"))
+                    .append("  [Q] ").append(I18n.t(language, "Close room", "Закрыть комнату")).append("\r\n");
         } else if (room.status() == RoomStatus.WAITING) {
-            builder.append("Waiting for host. Auto-refresh enabled. [Q] Leave room\r\n");
+            builder.append(I18n.t(language, "Waiting for host. Auto-refresh enabled. [Q] Leave room",
+                    "Ждём хоста. Автообновление включено. [Q] Выйти из комнаты")).append("\r\n");
         } else {
-            builder.append("Game is starting. Auto-refresh enabled.\r\n");
+            builder.append(I18n.t(language, "Game is starting. Auto-refresh enabled.",
+                    "Игра начинается. Автообновление включено.")).append("\r\n");
         }
         return builder.toString();
     }
 
+    public String settings(Account account) {
+        String language = I18n.lang(account);
+        return CLEAR
+                + title(I18n.t(language, "Settings", "Настройки"), language)
+                + "[1] " + I18n.t(language, "Nickname", "Ник") + ": " + account.nickname() + "\r\n"
+                + "[2] " + I18n.t(language, "Language", "Язык") + ": " + I18n.languageName(language) + "\r\n"
+                + "[B] " + I18n.t(language, "Back", "Назад") + "\r\n";
+    }
+
+    public String languageMenu(Account account) {
+        String language = I18n.lang(account);
+        return CLEAR
+                + title(I18n.t(language, "Language", "Язык"), language)
+                + "[1] English\r\n"
+                + "[2] Русский\r\n"
+                + "[B] " + I18n.t(language, "Back", "Назад") + "\r\n";
+    }
+
+    public String game(GameState state, Account viewerAccount, String roomCode, GameUiState uiState) {
+        return game(state, viewerAccount.id(), I18n.lang(viewerAccount), roomCode, uiState);
+    }
+
     public String game(GameState state, UUID viewerAccountId, String roomCode, GameUiState uiState) {
+        return game(state, viewerAccountId, "en", roomCode, uiState);
+    }
+
+    public String cardHelp(CardInstance card, Account account) {
+        String language = I18n.lang(account);
+        return CLEAR
+                + title(I18n.cardName(language, card), language)
+                + I18n.cardDescription(language, card)
+                + "\r\n\r\n" + I18n.t(language, "Press any key to return.", "Нажмите любую клавишу, чтобы вернуться.") + "\r\n";
+    }
+
+    public String message(Account account, String title, String message) {
+        String language = I18n.lang(account);
+        return CLEAR + title(title, language) + message + "\r\n\r\n"
+                + I18n.t(language, "Press any key to continue.", "Нажмите любую клавишу, чтобы продолжить.") + "\r\n";
+    }
+
+    private String game(GameState state, UUID viewerAccountId, String language, String roomCode, GameUiState uiState) {
         PlayerState viewer = state.findPlayer(viewerAccountId).orElse(null);
         StringBuilder builder = new StringBuilder(CLEAR)
-                .append(header(roomCode, state, viewer))
+                .append(header(roomCode, state, viewer, language))
                 .append("\r\n\r\n");
 
-        appendTable(builder, state, viewerAccountId, uiState);
+        appendTable(builder, state, viewerAccountId, uiState, language);
         builder.append("\r\n\r\n");
 
         state.pendingAction().ifPresentOrElse(
-                pending -> appendPending(builder, state, viewerAccountId, pending, uiState),
-                () -> appendTurnHint(builder, state, viewerAccountId, uiState)
+                pending -> appendPending(builder, state, viewerAccountId, pending, uiState, language),
+                () -> appendTurnHint(builder, state, viewerAccountId, uiState, language)
         );
 
         builder.append("\r\n");
         if (viewer != null) {
-            appendHand(builder, viewer, uiState);
+            appendHand(builder, viewer, uiState, language);
         }
 
         if (!uiState.message().isBlank()) {
             builder.append("\r\n").append(color(uiState.message(), YELLOW)).append("\r\n");
         }
 
-        builder.append("\r\n").append(DIM).append("Log").append(RESET).append("\r\n");
+        builder.append("\r\n").append(DIM).append(I18n.t(language, "Log", "Лог")).append(RESET).append("\r\n");
         List<String> log = state.log();
         int from = Math.max(0, log.size() - 6);
         for (String line : log.subList(from, log.size())) {
-            builder.append("- ").append(line).append("\r\n");
+            builder.append("- ").append(localizeLog(line, language)).append("\r\n");
         }
         return builder.toString();
     }
 
-    public String cardHelp(CardInstance card) {
-        return CLEAR
-                + title(card.name())
-                + card.definition().description()
-                + "\r\n\r\nPress any key to return.\r\n";
-    }
-
-    public String message(String title, String message) {
-        return CLEAR + title(title) + message + "\r\n\r\nPress any key to continue.\r\n";
-    }
-
-    private static String header(String roomCode, GameState state, PlayerState viewer) {
-        String nickname = viewer == null ? "unknown" : viewer.nickname();
-        return BOLD + color("Room " + roomCode, CYAN)
-                + RESET + " | " + color("Match " + shortId(state.id()), MAGENTA)
-                + " | You: " + color(nickname, GREEN)
-                + " | Phase: " + color(state.phase().name(), phaseColor(state.phase()))
+    private static String header(String roomCode, GameState state, PlayerState viewer, String language) {
+        String nickname = viewer == null ? I18n.t(language, "unknown", "неизвестно") : viewer.nickname();
+        return BOLD + color(I18n.t(language, "Room ", "Комната ") + roomCode, CYAN)
+                + RESET + " | " + color(I18n.t(language, "Match ", "Матч ") + shortId(state.id()), MAGENTA)
+                + " | " + I18n.t(language, "You: ", "Вы: ") + color(nickname, GREEN)
+                + " | " + I18n.t(language, "Phase: ", "Фаза: ") + color(I18n.phase(language, state.phase()), phaseColor(state.phase()))
                 + RESET;
     }
 
-    private static void appendTable(StringBuilder builder, GameState state, UUID viewerAccountId, GameUiState uiState) {
+    private static void appendTable(
+            StringBuilder builder,
+            GameState state,
+            UUID viewerAccountId,
+            GameUiState uiState,
+            String language
+    ) {
         Optional<PlayerState> maybeViewer = state.findPlayer(viewerAccountId);
         List<PlayerState> others = state.players().stream()
                 .filter(player -> !player.accountId().equals(viewerAccountId))
@@ -205,15 +267,16 @@ public final class TerminalRenderer {
         List<PlayerState> top = others.stream().limit(3).toList();
         List<PlayerState> lower = others.stream().skip(3).toList();
 
-        builder.append(center(joinSeats(top, state, viewerAccountId, uiState), 92)).append("\r\n");
+        builder.append(center(joinSeats(top, state, viewerAccountId, uiState, language), 92)).append("\r\n");
         builder.append(center(color("      .------------------------------------------.", BLUE), 92)).append("\r\n");
         builder.append(center(color("   .-'                                            '-.", BLUE), 92)).append("\r\n");
 
-        String left = lower.isEmpty() ? "" : seatLabel(lower.getFirst(), state, viewerAccountId, uiState);
-        String right = lower.size() < 2 ? "" : seatLabel(lower.get(1), state, viewerAccountId, uiState);
-        String middle = color("Deck " + state.drawPileSize(), GREEN)
+        String left = lower.isEmpty() ? "" : seatLabel(lower.getFirst(), state, viewerAccountId, uiState, language);
+        String right = lower.size() < 2 ? "" : seatLabel(lower.get(1), state, viewerAccountId, uiState, language);
+        String middle = color(I18n.t(language, "Deck ", "Колода ") + state.drawPileSize(), GREEN)
                 + "    "
-                + color("Discard " + state.topDiscard().map(CardInstance::name).orElse("-"), YELLOW);
+                + color(I18n.t(language, "Discard ", "Сброс ")
+                + state.topDiscard().map(card -> I18n.cardName(language, card)).orElse("-"), YELLOW);
         builder.append(fit(left, 31))
                 .append(color(" | ", BLUE))
                 .append(center(middle, 28))
@@ -221,71 +284,77 @@ public final class TerminalRenderer {
                 .append(fit(right, 31))
                 .append("\r\n");
 
-        String left2 = lower.size() < 3 ? "" : seatLabel(lower.get(2), state, viewerAccountId, uiState);
-        String right2 = lower.size() < 4 ? "" : seatLabel(lower.get(3), state, viewerAccountId, uiState);
+        String left2 = lower.size() < 3 ? "" : seatLabel(lower.get(2), state, viewerAccountId, uiState, language);
+        String right2 = lower.size() < 4 ? "" : seatLabel(lower.get(3), state, viewerAccountId, uiState, language);
         builder.append(fit(left2, 31))
                 .append(color(" | ", BLUE))
-                .append(center(color("active table", DIM), 28))
+                .append(center(color(I18n.t(language, "active table", "игровой стол"), DIM), 28))
                 .append(color(" | ", BLUE))
                 .append(fit(right2, 31))
                 .append("\r\n");
 
         builder.append(center(color("   '-.                                            .-'", BLUE), 92)).append("\r\n");
         builder.append(center(color("      '------------------------------------------'", BLUE), 92)).append("\r\n");
-        maybeViewer.ifPresent(viewer -> builder.append(center(seatLabel(viewer, state, viewerAccountId, uiState) + "  " + color("[YOU]", GREEN), 92)).append("\r\n"));
+        maybeViewer.ifPresent(viewer -> builder.append(center(seatLabel(viewer, state, viewerAccountId, uiState, language)
+                + "  " + color(I18n.t(language, "[YOU]", "[ВЫ]"), GREEN), 92)).append("\r\n"));
     }
 
-    private static String joinSeats(List<PlayerState> players, GameState state, UUID viewerAccountId, GameUiState uiState) {
+    private static String joinSeats(
+            List<PlayerState> players,
+            GameState state,
+            UUID viewerAccountId,
+            GameUiState uiState,
+            String language
+    ) {
         if (players.isEmpty()) {
-            return color("Waiting for seats", DIM);
+            return color(I18n.t(language, "Waiting for seats", "Ожидание игроков"), DIM);
         }
         return players.stream()
-                .map(player -> seatLabel(player, state, viewerAccountId, uiState))
+                .map(player -> seatLabel(player, state, viewerAccountId, uiState, language))
                 .reduce((left, right) -> left + "     " + right)
                 .orElse("");
     }
 
-    private static String seatLabel(PlayerState player, GameState state, UUID viewerAccountId, GameUiState uiState) {
+    private static String seatLabel(PlayerState player, GameState state, UUID viewerAccountId, GameUiState uiState, String language) {
         List<PlayerState> targets = targets(state, viewerAccountId);
         boolean current = state.currentPlayer().accountId().equals(player.accountId());
         boolean selectedTarget = uiState.focus() == GameFocus.TARGET
                 && targets.size() > uiState.selectedTarget()
                 && targets.get(uiState.selectedTarget()).accountId().equals(player.accountId());
         String marker = current ? color(">", YELLOW) : " ";
-        String nickname = player.accountId().equals(viewerAccountId) ? player.nickname() : player.nickname();
         String text = marker
-                + nickname
+                + player.nickname()
                 + " HP " + healthBar(player)
                 + " C" + player.handSize()
                 + " T" + player.inPlaySize()
-                + " " + visibleRole(player, viewerAccountId);
+                + " " + visibleRole(player, viewerAccountId, language);
         if (!player.connected()) {
-            text += " " + color("offline", RED);
+            text += " " + color(I18n.t(language, "offline", "оффлайн"), RED);
         }
         if (player.eliminated()) {
-            text += " " + color("out", RED);
+            text += " " + color(I18n.t(language, "out", "выбыл"), RED);
         }
         return selectedTarget ? BOLD + color("[" + text + "]", YELLOW) + RESET : text;
     }
 
-    private static void appendHand(StringBuilder builder, PlayerState player, GameUiState uiState) {
+    private static void appendHand(StringBuilder builder, PlayerState player, GameUiState uiState, String language) {
         builder.append(BOLD)
-                .append(color("Your hand", CYAN))
+                .append(color(I18n.t(language, "Your hand", "Ваша рука"), CYAN))
                 .append(RESET)
-                .append(" | Role: ")
-                .append(color(player.role().name(), MAGENTA))
-                .append(" | Character: ")
-                .append(color(player.character().name(), GREEN))
+                .append(" | ").append(I18n.t(language, "Role: ", "Роль: "))
+                .append(color(I18n.role(language, player.role()), MAGENTA))
+                .append(" | ").append(I18n.t(language, "Character: ", "Персонаж: "))
+                .append(color(I18n.characterName(language, player.character()), GREEN))
                 .append(" | HP ")
                 .append(healthBar(player))
                 .append("\r\n");
-        builder.append("Ability: ")
-                .append(player.character().description())
+        builder.append(I18n.t(language, "Ability: ", "Способность: "))
+                .append(I18n.characterDescription(language, player.character()))
                 .append("\r\n");
         if (!player.inPlay().isEmpty()) {
-            builder.append("In play: ");
+            builder.append(I18n.t(language, "In play: ", "На столе: "));
             for (CardInstance card : player.inPlay()) {
-                builder.append(color(card.name() + "(" + card.code() + ")", cardColor(card.kind()))).append("  ");
+                builder.append(color(I18n.cardName(language, card) + "(" + card.code() + ")", cardColor(card.kind()))).append("  ");
             }
             builder.append("\r\n");
         }
@@ -293,12 +362,14 @@ public final class TerminalRenderer {
             CardInstance card = player.hand().get(i);
             boolean selected = uiState.focus() == GameFocus.HAND && i == uiState.selectedCard();
             builder.append(selected ? BOLD + color(">", YELLOW) + " " : "  ");
-            builder.append(cardView(i + 1, card, selected));
+            builder.append(cardView(i + 1, card, selected, language));
             builder.append(selected ? " " + color("<", YELLOW) + RESET + "  " : "  ");
         }
         builder.append("\r\n");
         builder.append(DIM)
-                .append("Code: 9S = rank+suit for draw! checks; H/D red, S/C black.")
+                .append(I18n.t(language,
+                        "Code: 9S = rank+suit for draw! checks; H/D red, S/C black.",
+                        "Код: 9S = ранг+масть для draw!; H/D красные, S/C чёрные."))
                 .append(RESET)
                 .append("\r\n");
     }
@@ -308,36 +379,44 @@ public final class TerminalRenderer {
             GameState state,
             UUID viewerAccountId,
             PendingAction pending,
-            GameUiState uiState
+            GameUiState uiState,
+            String language
     ) {
         if (pending.type() == PendingActionType.GENERAL_STORE_PICK) {
-            appendGeneralStoreChoice(builder, state, viewerAccountId, pending, uiState);
+            appendGeneralStoreChoice(builder, state, viewerAccountId, pending, uiState, language);
             return;
         }
-        String response = StandardNames.cardName(pending.responseKind());
+        String response = I18n.cardName(language, pending.responseKind());
         String expected = state.findPlayer(pending.expectedAccountId())
                 .map(PlayerState::nickname)
-                .orElse("Unknown player");
+                .orElse(I18n.t(language, "Unknown player", "Неизвестный игрок"));
         if (pending.expectedAccountId().equals(viewerAccountId)) {
             if (pending.type() == PendingActionType.BANG_REACTION) {
                 builder.append(BOLD)
-                        .append(color("You may answer with " + response + ".", YELLOW))
+                        .append(color(I18n.t(language, "You may answer with ", "Можно ответить картой ") + response + ".", YELLOW))
                         .append(RESET)
-                        .append(" Enter to answer, Backspace to take damage.\r\n");
+                        .append(I18n.t(language, " Enter to answer, Backspace to take damage.",
+                                " Enter - ответить, Backspace - получить урон."))
+                        .append("\r\n");
             } else {
                 builder.append(BOLD)
-                        .append(color("You must answer with " + response + ".", YELLOW))
+                        .append(color(I18n.t(language, "You must answer with ", "Нужно ответить картой ") + response + ".", YELLOW))
                         .append(RESET)
-                        .append(" Enter to answer, Backspace to fail.\r\n");
+                        .append(I18n.t(language, " Enter to answer, Backspace to fail.",
+                                " Enter - ответить, Backspace - отказаться."))
+                        .append("\r\n");
             }
             return;
         }
-        String action = pending.type() == PendingActionType.BANG_REACTION ? "may answer with " : "must answer with ";
+        String action = pending.type() == PendingActionType.BANG_REACTION
+                ? I18n.t(language, "may answer with ", "может ответить картой ")
+                : I18n.t(language, "must answer with ", "должен ответить картой ");
         builder.append(color(expected, YELLOW))
                 .append(" ")
                 .append(action)
                 .append(response)
-                .append(". Auto-refresh enabled.\r\n");
+                .append(I18n.t(language, ". Auto-refresh enabled.", ". Автообновление включено."))
+                .append("\r\n");
     }
 
     private static void appendGeneralStoreChoice(
@@ -345,52 +424,75 @@ public final class TerminalRenderer {
             GameState state,
             UUID viewerAccountId,
             PendingAction pending,
-            GameUiState uiState
+            GameUiState uiState,
+            String language
     ) {
         String expected = state.findPlayer(pending.expectedAccountId())
                 .map(PlayerState::nickname)
-                .orElse("Unknown player");
+                .orElse(I18n.t(language, "Unknown player", "Неизвестный игрок"));
         if (!pending.expectedAccountId().equals(viewerAccountId)) {
             builder.append(color(expected, YELLOW))
-                    .append(" is choosing a General Store card. Auto-refresh enabled.\r\n");
-            appendChoiceCards(builder, pending.choiceCards(), -1);
+                    .append(I18n.t(language,
+                            " is choosing a General Store card. Auto-refresh enabled.",
+                            " выбирает карту из Магазина. Автообновление включено."))
+                    .append("\r\n");
+            appendChoiceCards(builder, pending.choiceCards(), -1, language);
             return;
         }
         int selected = Math.min(uiState.selectedChoice(), Math.max(0, pending.choiceCards().size() - 1));
         builder.append(BOLD)
-                .append(color("Choose one General Store card.", YELLOW))
+                .append(color(I18n.t(language, "Choose one General Store card.", "Выберите одну карту из Магазина."), YELLOW))
                 .append(RESET)
-                .append(" ←/→ or 1-9 select, Enter take, ?, /, or . for help.\r\n");
-        appendChoiceCards(builder, pending.choiceCards(), selected);
+                .append(I18n.t(language,
+                        " ←/→ or 1-9 select, Enter take, ?, /, or . for help.",
+                        " ←/→ или 1-9 выбор, Enter взять, ?, / или . описание."))
+                .append("\r\n");
+        appendChoiceCards(builder, pending.choiceCards(), selected, language);
     }
 
-    private static void appendTurnHint(StringBuilder builder, GameState state, UUID viewerAccountId, GameUiState uiState) {
+    private static void appendTurnHint(StringBuilder builder, GameState state, UUID viewerAccountId, GameUiState uiState, String language) {
         if (state.winner().isPresent()) {
-            builder.append("Winner: ").append(color(state.winner().orElseThrow().name(), GREEN)).append(". Press any key.\r\n");
+            builder.append(I18n.t(language, "Winner: ", "Победитель: "))
+                    .append(color(I18n.winner(language, state.winner().orElseThrow()), GREEN))
+                    .append(I18n.t(language, ". Press any key.", ". Нажмите любую клавишу."))
+                    .append("\r\n");
             return;
         }
         if (!state.currentPlayer().accountId().equals(viewerAccountId)) {
-            builder.append("Waiting for ").append(color(state.currentPlayer().nickname(), YELLOW)).append(". Auto-refresh enabled. [Q] exit session\r\n");
+            builder.append(I18n.t(language, "Waiting for ", "Ожидание игрока "))
+                    .append(color(state.currentPlayer().nickname(), YELLOW))
+                    .append(I18n.t(language, ". Auto-refresh enabled. [Q] exit session",
+                            ". Автообновление включено. [Q] выйти из сессии"))
+                    .append("\r\n");
             return;
         }
         if (state.phase() == GamePhase.DISCARD) {
-            builder.append("Discard down to health. ←/→ or 1-9 select, Enter discard, ?, /, or . for help.\r\n");
+            builder.append(I18n.t(language,
+                    "Discard down to health. ←/→ or 1-9 select, Enter discard, ?, /, or . for help.",
+                    "Сбросьте карты до лимита жизней. ←/→ или 1-9 выбор, Enter сбросить, ?, / или . описание."))
+                    .append("\r\n");
             return;
         }
         if (uiState.focus() == GameFocus.TARGET) {
-            builder.append("Select target: ←/→ move, Enter confirm, Backspace cancel.\r\n");
-            appendTargetList(builder, state, viewerAccountId, uiState);
+            builder.append(I18n.t(language,
+                    "Select target: ←/→ move, Enter confirm, Backspace cancel.",
+                    "Выберите цель: ←/→ перемещение, Enter подтвердить, Backspace отмена."))
+                    .append("\r\n");
+            appendTargetList(builder, state, viewerAccountId, uiState, language);
         } else {
-            builder.append("←/→ or 1-9 select card, Enter play, ?, /, or . for help, E end turn, Q exit session.\r\n");
+            builder.append(I18n.t(language,
+                    "←/→ or 1-9 select card, Enter play, ?, /, or . for help, E end turn, Q exit session.",
+                    "←/→ или 1-9 выбор карты, Enter сыграть, ?, / или . описание, E конец хода, Q выход."))
+                    .append("\r\n");
         }
     }
 
-    private static void appendChoiceCards(StringBuilder builder, List<CardInstance> cards, int selected) {
+    private static void appendChoiceCards(StringBuilder builder, List<CardInstance> cards, int selected, String language) {
         for (int i = 0; i < cards.size(); i++) {
             CardInstance card = cards.get(i);
             boolean active = i == selected;
             builder.append(active ? BOLD + color(">", YELLOW) + " " : "  ");
-            builder.append(cardView(i + 1, card, active));
+            builder.append(cardView(i + 1, card, active, language));
             builder.append(active ? " " + color("<", YELLOW) + RESET + "  " : "  ");
         }
         builder.append("\r\n");
@@ -400,7 +502,8 @@ public final class TerminalRenderer {
             StringBuilder builder,
             GameState state,
             UUID viewerAccountId,
-            GameUiState uiState
+            GameUiState uiState,
+            String language
     ) {
         List<PlayerState> targets = targets(state, viewerAccountId);
         for (int i = 0; i < targets.size(); i++) {
@@ -427,15 +530,15 @@ public final class TerminalRenderer {
                 .toList();
     }
 
-    private static String visibleRole(PlayerState player, UUID viewerAccountId) {
+    private static String visibleRole(PlayerState player, UUID viewerAccountId, String language) {
         if (player.accountId().equals(viewerAccountId) || player.role().visibleAtStart() || player.eliminated()) {
-            return player.role().name();
+            return I18n.role(language, player.role());
         }
-        return "HIDDEN";
+        return I18n.t(language, "HIDDEN", "СКРЫТО");
     }
 
-    private static String cardView(int number, CardInstance card, boolean selected) {
-        String text = "[" + number + " " + card.name() + " " + card.code() + "]";
+    private static String cardView(int number, CardInstance card, boolean selected, String language) {
+        String text = "[" + number + " " + I18n.cardName(language, card) + " " + card.code() + "]";
         String color = cardColor(card.kind());
         return selected ? color(text, color) : color(text, color);
     }
@@ -467,8 +570,8 @@ public final class TerminalRenderer {
         };
     }
 
-    private static String title(String text) {
-        return BOLD + color(text, CYAN) + RESET + "\r\n" + "=".repeat(Math.max(3, text.length())) + "\r\n\r\n";
+    private static String title(String text, String language) {
+        return BOLD + color(text, CYAN) + RESET + "\r\n" + "=".repeat(Math.max(3, visibleLength(text))) + "\r\n\r\n";
     }
 
     private static String shortId(UUID id) {
@@ -499,16 +602,50 @@ public final class TerminalRenderer {
         return color + text + RESET;
     }
 
-    private static final class StandardNames {
-        private StandardNames() {
+    private static String roomVisibility(String language, RoomVisibility visibility) {
+        if (!"ru".equals(I18n.lang(language))) {
+            return visibility.name();
         }
+        return switch (visibility) {
+            case PRIVATE -> "ПРИВАТНАЯ";
+            case PUBLIC -> "ПУБЛИЧНАЯ";
+        };
+    }
 
-        private static String cardName(CardKind kind) {
-            return switch (kind) {
-                case BANG -> "Bang";
-                case MISSED -> "Missed";
-                default -> kind.name();
-            };
+    private static String roomStatus(String language, RoomStatus status) {
+        if (!"ru".equals(I18n.lang(language))) {
+            return status.name();
         }
+        return switch (status) {
+            case WAITING -> "ОЖИДАНИЕ";
+            case IN_GAME -> "В ИГРЕ";
+            case FINISHED -> "ЗАВЕРШЕНА";
+        };
+    }
+
+    private static String localizeLog(String line, String language) {
+        if (!"ru".equals(I18n.lang(language))) {
+            return line;
+        }
+        return line
+                .replace(" starts as Sheriff.", " начинает как Шериф.")
+                .replace(" starts a turn.", " начинает ход.")
+                .replace(" draws two cards.", " берёт две карты.")
+                .replace(" draws three cards.", " берёт три карты.")
+                .replace(" must discard down to health limit.", " должен сбросить карты до лимита жизней.")
+                .replace(" discards a card.", " сбрасывает карту.")
+                .replace(" disconnected.", " отключился.")
+                .replace(" reconnected.", " переподключился.")
+                .replace(" is disconnected. Waiting before skip.", " отключён. Ждём перед пропуском.")
+                .replace(" timed out. Turn skipped.", " не успел вернуться. Ход пропущен.")
+                .replace(" cancels the Bang.", " отменяет Бэнг.")
+                .replace(" answers the duel.", " отвечает в дуэли.")
+                .replace(" opens General Store.", " открывает Магазин.")
+                .replace(" opens the Saloon. Everyone recovers one life.", " открывает Салун. Все восстанавливают 1 жизнь.")
+                .replace(" recovers one life.", " восстанавливает 1 жизнь.")
+                .replace(" is eliminated as ", " выбывает с ролью ")
+                .replace("Winner: LAW.", "Победитель: ЗАКОН.")
+                .replace("Winner: OUTLAWS.", "Победитель: БАНДИТЫ.")
+                .replace("Winner: RENEGADE.", "Победитель: РЕНЕГАТ.");
     }
 }

@@ -11,5 +11,6 @@ public interface AccountRepository {
     Optional<Account> findById(UUID accountId);
 
     Account updateNickname(UUID accountId, String nickname);
-}
 
+    Account updateLanguage(UUID accountId, String language);
+}

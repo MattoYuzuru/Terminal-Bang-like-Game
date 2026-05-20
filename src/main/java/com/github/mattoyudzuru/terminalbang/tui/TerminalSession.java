@@ -53,7 +53,7 @@ public final class TerminalSession {
         roomService.reconnect(account.id());
         try {
             if (size.tooSmall()) {
-                io.write(renderer.resizeWarning(size));
+                io.write(renderer.resizeWarning(size, account));
                 TerminalKey key = io.readKey();
                 if (key.isCharacter('q') || key.type() == TerminalKeyType.CTRL_C) {
                     return;
@@ -88,10 +88,10 @@ public final class TerminalSession {
                     io.readKey();
                 }
                 case 2 -> {
-                    io.write(renderer.leaderboard(matchResultRepository.leaderboard(10)));
+                    io.write(renderer.leaderboard(current, matchResultRepository.leaderboard(10)));
                     io.readKey();
                 }
-                case 3 -> current = updateNickname(io, current);
+                case 3 -> current = runSettingsMenu(io, current);
                 default -> {
                 }
             }
@@ -100,7 +100,7 @@ public final class TerminalSession {
 
     private void runPlayMenu(SessionIo io, Account account) throws IOException {
         while (true) {
-            io.write(renderer.playMenu(roomService.publicRooms()));
+            io.write(renderer.playMenu(account, roomService.publicRooms()));
             TerminalKey key = io.readKey();
             if (key.isCharacter('b') || key.isCharacter('q') || key.type() == TerminalKeyType.CTRL_C) {
                 return;
@@ -120,16 +120,51 @@ public final class TerminalSession {
 
     private Account updateNickname(SessionIo io, Account account) throws IOException {
         io.write("\u001B[2J\u001B[H");
-        String nickname = io.readLine("Nickname: ").trim();
+        String nickname = io.readLine(I18n.t(I18n.lang(account), "Nickname: ", "Ник: ")).trim();
         if (nickname.isBlank()) {
             return account;
         }
         return accountRepository.updateNickname(account.id(), nickname);
     }
 
+    private Account runSettingsMenu(SessionIo io, Account account) throws IOException {
+        Account current = account;
+        while (true) {
+            io.write(renderer.settings(current));
+            TerminalKey key = io.readKey();
+            if (key.isCharacter('b') || key.isCharacter('q') || key.type() == TerminalKeyType.CTRL_C) {
+                return current;
+            }
+            if (key.type() != TerminalKeyType.DIGIT) {
+                continue;
+            }
+            switch (key.digitIndex()) {
+                case 0 -> current = updateNickname(io, current);
+                case 1 -> current = updateLanguage(io, current);
+                default -> {
+                }
+            }
+        }
+    }
+
+    private Account updateLanguage(SessionIo io, Account account) throws IOException {
+        io.write(renderer.languageMenu(account));
+        TerminalKey key = io.readKey();
+        if (key.type() != TerminalKeyType.DIGIT) {
+            return account;
+        }
+        if (key.digitIndex() == 0) {
+            return accountRepository.updateLanguage(account.id(), "en");
+        }
+        if (key.digitIndex() == 1) {
+            return accountRepository.updateLanguage(account.id(), "ru");
+        }
+        return account;
+    }
+
     private void joinPublicRoom(SessionIo io, Account account) throws IOException {
         List<Room> publicRooms = roomService.publicRooms();
-        io.write(renderer.publicRooms(publicRooms));
+        io.write(renderer.publicRooms(account, publicRooms));
         TerminalKey key = io.readKey();
         if (key.type() != TerminalKeyType.DIGIT || key.digitIndex() >= publicRooms.size()) {
             return;
@@ -146,7 +181,9 @@ public final class TerminalSession {
         try {
             runLobby(io, account, roomService.joinRoom(account, code));
         } catch (RuntimeException exception) {
-            showMessage(io, "Join failed", exception.getMessage());
+            showMessage(io, account,
+                    I18n.t(I18n.lang(account), "Join failed", "Не удалось войти"),
+                    exception.getMessage());
         }
     }
 
@@ -181,7 +218,9 @@ public final class TerminalSession {
                     kickPlayer(io, account, currentRoom);
                 }
             } catch (RuntimeException exception) {
-                showMessage(io, "Room action failed", exception.getMessage());
+                showMessage(io, account,
+                        I18n.t(I18n.lang(account), "Room action failed", "Действие с комнатой не выполнено"),
+                        exception.getMessage());
             }
         }
     }
@@ -208,7 +247,7 @@ public final class TerminalSession {
             roomService.tick();
             GameState state = engine.state();
             clampSelection(state, account, uiState);
-            io.write(renderer.game(state, account.id(), currentRoomCode(account), uiState));
+            io.write(renderer.game(state, account, currentRoomCode(account), uiState));
             if (state.winner().isPresent()) {
                 persistFinishedSafely(engine, uiState);
             }
@@ -280,9 +319,9 @@ public final class TerminalSession {
         if (key.isCharacter('?') || key.isCharacter('/') || key.isCharacter('.')) {
             if (player.handSize() > 0) {
                 CardInstance card = player.hand().get(uiState.selectedCard());
-                uiState.setMessage(card.name() + ": " + card.definition().description());
+                uiState.setMessage(I18n.cardHelp(I18n.lang(account), card));
             } else {
-                uiState.setMessage("No card selected.");
+                uiState.setMessage(I18n.t(I18n.lang(account), "No card selected.", "Карта не выбрана."));
             }
             return;
         }
@@ -321,7 +360,7 @@ public final class TerminalSession {
         if (key.isCharacter('?') || key.isCharacter('/') || key.isCharacter('.')) {
             if (!pending.choiceCards().isEmpty()) {
                 CardInstance card = pending.choiceCards().get(uiState.selectedChoice());
-                uiState.setMessage(card.name() + ": " + card.definition().description());
+                uiState.setMessage(I18n.cardHelp(I18n.lang(account), card));
             }
             return;
         }
@@ -413,8 +452,8 @@ public final class TerminalSession {
         return Math.floorMod(value, size);
     }
 
-    private void showMessage(SessionIo io, String title, String message) throws IOException {
-        io.write(renderer.message(title, message == null ? "" : message));
+    private void showMessage(SessionIo io, Account account, String title, String message) throws IOException {
+        io.write(renderer.message(account, title, message == null ? "" : message));
         io.readKey();
     }
 
