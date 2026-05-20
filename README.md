@@ -102,7 +102,7 @@ TB_DB_POOL_SIZE   default 8
 
 - TUI пока простой ANSI-интерфейс, не финальный красивый веер карт.
 - Resize определяется по начальному `COLUMNS/LINES`; live resize через WINCH ещё не реализован.
-- General Store, Jesse Jones и Kit Carlson в MVP выбирают карты автоматически, потому что интерактивный выбор для этих эффектов ещё не вынесен в отдельный pending-screen.
+- Jesse Jones и Kit Carlson в MVP выбирают карты автоматически, потому что их интерактивные draw-phase решения ещё не вынесены в отдельный pending-screen.
 - Нет AI/bot игроков; для матча нужны реальные SSH-сессии.
 - Нет рейтинга, spectator mode и чата.
 

@@ -21,14 +21,26 @@ public final class JdbcMatchResultRepository implements MatchResultRepository {
         String matchSql = """
                 INSERT INTO match_results (id, room_code, status, winner, started_at, finished_at)
                 VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT (id) DO NOTHING
+                ON CONFLICT (id) DO UPDATE SET
+                    room_code = EXCLUDED.room_code,
+                    status = EXCLUDED.status,
+                    winner = EXCLUDED.winner,
+                    started_at = EXCLUDED.started_at,
+                    finished_at = EXCLUDED.finished_at
                 """;
         String playerSql = """
                 INSERT INTO player_match_stats (
                     match_id, account_id, nickname, role, won, eliminated, damage_dealt, damage_taken, cards_played
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT (match_id, account_id) DO NOTHING
+                ON CONFLICT (match_id, account_id) DO UPDATE SET
+                    nickname = EXCLUDED.nickname,
+                    role = EXCLUDED.role,
+                    won = EXCLUDED.won,
+                    eliminated = EXCLUDED.eliminated,
+                    damage_dealt = EXCLUDED.damage_dealt,
+                    damage_taken = EXCLUDED.damage_taken,
+                    cards_played = EXCLUDED.cards_played
                 """;
         try (var connection = dataSource.getConnection()) {
             boolean autoCommit = connection.getAutoCommit();
@@ -97,4 +109,3 @@ public final class JdbcMatchResultRepository implements MatchResultRepository {
         }
     }
 }
-

@@ -26,7 +26,7 @@ class GameEngineTest {
         assertEquals(GamePhase.PLAY, state.phase());
         assertEquals(Role.SHERIFF, state.currentPlayer().role());
         assertEquals(4, state.players().size());
-        assertEquals(state.currentPlayer().maxHealth(), state.currentPlayer().handSize());
+        assertTrue(state.currentPlayer().handSize() >= state.currentPlayer().maxHealth() + 2);
         assertTrue(state.currentTurnDrawn());
     }
 
@@ -78,6 +78,53 @@ class GameEngineTest {
         assertEquals(healthBefore - 1, target.health());
         assertEquals(1, shooter.damageDealt());
         assertEquals(1, target.damageTaken());
+    }
+
+    @Test
+    void barrelCanCancelBangOnHeartDraw() {
+        GameEngine engine = newGame(4);
+        PlayerState shooter = engine.state().currentPlayer();
+        PlayerState target = adjacentTarget(engine.state());
+        int healthBefore = target.health();
+        shooter.addCard(CardInstance.create(StandardContent.card(CardKind.BANG)));
+        target.addInPlay(CardInstance.create(StandardContent.card(CardKind.BARREL)));
+        engine.state().drawPile().push(CardInstance.create(
+                StandardContent.card(CardKind.BEER),
+                CardSuit.HEARTS,
+                CardRank.FIVE
+        ));
+
+        engine.playCard(shooter.accountId(), shooter.handSize() - 1, Optional.of(target.accountId()));
+        engine.resolvePending(target.accountId(), true);
+
+        assertFalse(engine.state().pendingAction().isPresent());
+        assertEquals(healthBefore, target.health());
+    }
+
+    @Test
+    void duelConsumesBangOnlyWhenPlayerAnswers() {
+        GameEngine engine = newGame(4);
+        PlayerState actor = engine.state().currentPlayer();
+        PlayerState target = adjacentTarget(engine.state());
+        actor.addCard(CardInstance.create(StandardContent.card(CardKind.DUEL)));
+        actor.addCard(CardInstance.create(StandardContent.card(CardKind.BANG)));
+        target.addCard(CardInstance.create(StandardContent.card(CardKind.BANG)));
+        int actorBangBefore = countHand(actor, CardKind.BANG);
+        int targetBangBefore = countHand(target, CardKind.BANG);
+
+        engine.playCard(actor.accountId(), actor.handSize() - 2, Optional.of(target.accountId()));
+
+        assertEquals(actorBangBefore, countHand(actor, CardKind.BANG));
+        assertEquals(PendingActionType.DUEL_RESPONSE, engine.state().pendingAction().orElseThrow().type());
+
+        engine.resolvePending(target.accountId(), true);
+
+        assertEquals(targetBangBefore - 1, countHand(target, CardKind.BANG));
+        assertEquals(actor.accountId(), engine.state().pendingAction().orElseThrow().expectedAccountId());
+
+        engine.resolvePending(actor.accountId(), true);
+
+        assertEquals(actorBangBefore - 1, countHand(actor, CardKind.BANG));
     }
 
     @Test
@@ -137,10 +184,27 @@ class GameEngineTest {
     }
 
     @Test
+    void beerAtFullHealthIsRejectedWithoutSpendingCard() {
+        GameEngine engine = newGame(4);
+        PlayerState actor = engine.state().currentPlayer();
+        actor.addCard(CardInstance.create(StandardContent.card(CardKind.BEER)));
+        int handBefore = actor.handSize();
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> engine.playCard(actor.accountId(), actor.handSize() - 1, Optional.empty())
+        );
+        assertEquals(handBefore, actor.handSize());
+    }
+
+    @Test
     void jailCannotBePlayedOnSheriff() {
         GameEngine engine = newGame(4);
         PlayerState sheriff = engine.state().currentPlayer();
         engine.endTurn(sheriff.accountId());
+        while (engine.state().phase() == GamePhase.DISCARD) {
+            engine.discardForLimit(sheriff.accountId(), 0);
+        }
         PlayerState actor = engine.state().currentPlayer();
         actor.addCard(CardInstance.create(StandardContent.card(CardKind.JAIL)));
 
@@ -160,6 +224,27 @@ class GameEngineTest {
 
         assertEquals(PendingActionType.GATLING_REACTION, engine.state().pendingAction().orElseThrow().type());
         assertEquals(CardKind.MISSED, engine.state().pendingAction().orElseThrow().responseKind());
+    }
+
+    @Test
+    void generalStoreWaitsForPlayersToChooseCards() {
+        GameEngine engine = newGame(4);
+        PlayerState actor = engine.state().currentPlayer();
+        actor.addCard(CardInstance.create(StandardContent.card(CardKind.GENERAL_STORE)));
+
+        engine.playCard(actor.accountId(), actor.handSize() - 1, Optional.empty());
+
+        PendingAction firstPick = engine.state().pendingAction().orElseThrow();
+        assertEquals(PendingActionType.GENERAL_STORE_PICK, firstPick.type());
+        assertEquals(actor.accountId(), firstPick.expectedAccountId());
+        assertEquals(engine.state().alivePlayers().size(), firstPick.choiceCards().size());
+
+        engine.choosePendingCard(actor.accountId(), 0);
+
+        PendingAction secondPick = engine.state().pendingAction().orElseThrow();
+        assertEquals(PendingActionType.GENERAL_STORE_PICK, secondPick.type());
+        assertNotEquals(actor.accountId(), secondPick.expectedAccountId());
+        assertEquals(firstPick.choiceCards().size() - 1, secondPick.choiceCards().size());
     }
 
     @Test
@@ -224,6 +309,12 @@ class GameEngineTest {
 
     private static long count(List<CardInstance> deck, CardKind kind) {
         return deck.stream().filter(card -> card.kind() == kind).count();
+    }
+
+    private static int countHand(PlayerState player, CardKind kind) {
+        return (int) player.hand().stream()
+                .filter(card -> card.kind() == kind)
+                .count();
     }
 
     private static PlayerState adjacentTarget(GameState state) {

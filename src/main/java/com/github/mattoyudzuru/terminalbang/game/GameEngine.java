@@ -69,7 +69,9 @@ public final class GameEngine {
         state.currentPlayer().resetTurnFlags();
         state.addLog(state.currentPlayer().nickname() + " starts as Sheriff.");
 
-        return new GameEngine(state, random, clock);
+        GameEngine engine = new GameEngine(state, random, clock);
+        engine.beginConnectedTurn(state.currentPlayer());
+        return engine;
     }
 
     public GameState state() {
@@ -103,6 +105,7 @@ public final class GameEngine {
         Optional<PlayerState> maybeTarget = targetAccountId.map(this::requireAlivePlayer);
         maybeTarget.ifPresent(target -> validateTarget(actor, effectiveKind, target));
         validateTableCard(actor, effectiveKind);
+        validateImmediateCard(actor, effectiveKind);
 
         actor.removeCard(handIndex);
         actor.recordCardPlayed();
@@ -117,8 +120,8 @@ public final class GameEngine {
                 playBang(actor, maybeTarget.orElseThrow());
             }
             case BEER -> {
-                discard(card);
                 playBeer(actor);
+                discard(card);
             }
             case CAT_BALOU -> {
                 discard(card);
@@ -145,8 +148,8 @@ public final class GameEngine {
                 stealRandomVisibleCard(actor, maybeTarget.orElseThrow());
             }
             case SALOON -> {
-                discard(card);
                 playSaloon(actor);
+                discard(card);
             }
             case STAGECOACH -> {
                 discard(card);
@@ -178,6 +181,9 @@ public final class GameEngine {
 
         PlayerState expected = requireAlivePlayer(pending.expectedAccountId());
         PlayerState opponent = requirePlayer(pending.opponentAccountId());
+        if (pending.type() == PendingActionType.GENERAL_STORE_PICK) {
+            throw new IllegalStateException("Choose a General Store card instead");
+        }
         boolean answered = playResponse && consumeResponses(
                 expected,
                 pending.responseKind(),
@@ -222,6 +228,28 @@ public final class GameEngine {
                 checkWinConditions();
             }
         }
+    }
+
+    public void choosePendingCard(UUID actorAccountId, int choiceIndex) {
+        requireActive();
+        PendingAction pending = state.pendingAction()
+                .orElseThrow(() -> new IllegalStateException("There is no pending card choice"));
+        if (pending.type() != PendingActionType.GENERAL_STORE_PICK) {
+            throw new IllegalStateException("The game is not waiting for a card choice");
+        }
+        if (!pending.expectedAccountId().equals(actorAccountId)) {
+            throw new IllegalArgumentException("Card choice belongs to another player");
+        }
+        if (choiceIndex < 0 || choiceIndex >= pending.choiceCards().size()) {
+            throw new IllegalArgumentException("Card choice index out of range");
+        }
+
+        PlayerState player = requireAlivePlayer(actorAccountId);
+        List<CardInstance> choices = new ArrayList<>(pending.choiceCards());
+        CardInstance picked = choices.remove(choiceIndex);
+        player.addCard(picked);
+        state.addLog(player.nickname() + " takes " + picked.name() + " from General Store.");
+        advanceGeneralStorePick(requirePlayer(pending.opponentAccountId()), pending.remainingAccountIds(), choices);
     }
 
     public void endTurn(UUID actorAccountId) {
@@ -396,6 +424,19 @@ public final class GameEngine {
         }
     }
 
+    private void validateImmediateCard(PlayerState actor, CardKind kind) {
+        if (kind == CardKind.BEER && actor.health() >= actor.maxHealth()) {
+            throw new IllegalArgumentException("Beer cannot be used at full health");
+        }
+        if (kind == CardKind.SALOON) {
+            boolean anyDamaged = state.alivePlayers().stream()
+                    .anyMatch(player -> player.health() < player.maxHealth());
+            if (!anyDamaged) {
+                throw new IllegalArgumentException("Saloon cannot recover anyone right now");
+            }
+        }
+    }
+
     private void playBang(PlayerState actor, PlayerState target) {
         if (!target.connected()) {
             damage(actor, target, 1);
@@ -504,13 +545,11 @@ public final class GameEngine {
         for (int i = 0; i < state.alivePlayers().size(); i++) {
             drawCard(state, random).ifPresent(revealed::add);
         }
-        for (PlayerState player : alivePlayersFrom(actor)) {
-            if (revealed.isEmpty()) {
-                break;
-            }
-            player.addCard(revealed.removeFirst());
-        }
-        state.addLog(actor.nickname() + " opens General Store. Cards are distributed clockwise.");
+        state.addLog(actor.nickname() + " opens General Store.");
+        List<UUID> pickOrder = alivePlayersFrom(actor).stream()
+                .map(PlayerState::accountId)
+                .toList();
+        advanceGeneralStorePick(actor, pickOrder, revealed);
     }
 
     private void playInFrontOfSelf(PlayerState actor, CardInstance card) {
@@ -533,6 +572,7 @@ public final class GameEngine {
         }
         while (remaining > 0 && discardFirstResponse(player, responseKind)) {
             player.recordCardPlayed();
+            state.addLog(player.nickname() + " discards " + StandardContent.card(responseKind).name() + ".");
             remaining--;
         }
         return remaining == 0;
@@ -727,6 +767,34 @@ public final class GameEngine {
         state.setCurrentTurnDrawn(true);
     }
 
+    private void advanceGeneralStorePick(PlayerState actor, List<UUID> targetAccountIds, List<CardInstance> choiceCards) {
+        List<UUID> remaining = new ArrayList<>(targetAccountIds);
+        List<CardInstance> choices = new ArrayList<>(choiceCards);
+        while (!remaining.isEmpty() && !choices.isEmpty()) {
+            Optional<PlayerState> maybePlayer = state.findPlayer(remaining.removeFirst());
+            if (maybePlayer.isEmpty() || maybePlayer.orElseThrow().eliminated()) {
+                continue;
+            }
+            PlayerState player = maybePlayer.orElseThrow();
+            if (!player.connected()) {
+                CardInstance picked = choices.removeFirst();
+                player.addCard(picked);
+                state.addLog(player.nickname() + " is offline and receives " + picked.name() + " from General Store.");
+                continue;
+            }
+            state.setPendingAction(PendingAction.generalStorePick(
+                    player.accountId(),
+                    actor.accountId(),
+                    remaining,
+                    choices,
+                    player.nickname() + " must choose a General Store card."
+            ));
+            return;
+        }
+        choices.forEach(this::discard);
+        state.clearPendingAction();
+    }
+
     private void processDynamite(PlayerState current) {
         Optional<CardInstance> maybeDynamite = current.removeInPlay(CardKind.DYNAMITE);
         if (maybeDynamite.isEmpty()) {
@@ -910,6 +978,7 @@ public final class GameEngine {
             case INDIANS_REACTION -> "Indians";
             case BANG_REACTION -> "Bang";
             case DUEL_RESPONSE -> "Duel";
+            case GENERAL_STORE_PICK -> "General Store";
         };
     }
 

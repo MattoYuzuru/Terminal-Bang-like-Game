@@ -5,6 +5,8 @@ import com.github.mattoyudzuru.terminalbang.game.CardKind;
 import com.github.mattoyudzuru.terminalbang.game.GameEngine;
 import com.github.mattoyudzuru.terminalbang.game.GamePhase;
 import com.github.mattoyudzuru.terminalbang.game.GameState;
+import com.github.mattoyudzuru.terminalbang.game.PendingAction;
+import com.github.mattoyudzuru.terminalbang.game.PendingActionType;
 import com.github.mattoyudzuru.terminalbang.game.PlayerState;
 import com.github.mattoyudzuru.terminalbang.persistence.AccountRepository;
 import com.github.mattoyudzuru.terminalbang.persistence.MatchResultRepository;
@@ -207,9 +209,12 @@ public final class TerminalSession {
             GameState state = engine.state();
             clampSelection(state, account, uiState);
             io.write(renderer.game(state, account.id(), currentRoomCode(account), uiState));
+            if (state.winner().isPresent()) {
+                persistFinishedSafely(engine, uiState);
+            }
             Optional<TerminalKey> maybeKey = io.readKey(AUTO_REFRESH_INTERVAL);
             if (maybeKey.isEmpty()) {
-                roomService.persistIfFinished(engine);
+                persistFinishedSafely(engine, uiState);
                 continue;
             }
             TerminalKey key = maybeKey.orElseThrow();
@@ -221,7 +226,7 @@ public final class TerminalSession {
             }
             try {
                 handleGameKey(state, engine, account, uiState, key, io);
-                roomService.persistIfFinished(engine);
+                persistFinishedSafely(engine, uiState);
             } catch (RuntimeException exception) {
                 uiState.setMessage(exception.getMessage());
             }
@@ -239,6 +244,10 @@ public final class TerminalSession {
         if (state.pendingAction().isPresent()) {
             var pending = state.pendingAction().orElseThrow();
             if (!pending.expectedAccountId().equals(account.id())) {
+                return;
+            }
+            if (pending.type() == PendingActionType.GENERAL_STORE_PICK) {
+                handleCardChoice(engine, account, uiState, key);
                 return;
             }
             if (key.type() == TerminalKeyType.ENTER) {
@@ -295,6 +304,34 @@ public final class TerminalSession {
         }
     }
 
+    private void handleCardChoice(GameEngine engine, Account account, GameUiState uiState, TerminalKey key) {
+        var pending = engine.state().pendingAction().orElseThrow();
+        if (key.type() == TerminalKeyType.LEFT) {
+            moveChoice(uiState, pending.choiceCards().size(), -1);
+            return;
+        }
+        if (key.type() == TerminalKeyType.RIGHT) {
+            moveChoice(uiState, pending.choiceCards().size(), 1);
+            return;
+        }
+        if (key.type() == TerminalKeyType.DIGIT && key.digitIndex() < pending.choiceCards().size()) {
+            uiState.setSelectedChoice(key.digitIndex());
+            return;
+        }
+        if (key.isCharacter('?') || key.isCharacter('/') || key.isCharacter('.')) {
+            if (!pending.choiceCards().isEmpty()) {
+                CardInstance card = pending.choiceCards().get(uiState.selectedChoice());
+                uiState.setMessage(card.name() + ": " + card.definition().description());
+            }
+            return;
+        }
+        if (key.type() == TerminalKeyType.ENTER) {
+            engine.choosePendingCard(account.id(), uiState.selectedChoice());
+            uiState.setSelectedChoice(0);
+            uiState.setFocus(GameFocus.HAND);
+        }
+    }
+
     private void playSelectedCard(GameState state, GameEngine engine, Account account, GameUiState uiState, PlayerState player) {
         CardInstance card = player.hand().get(uiState.selectedCard());
         if (requiresTargetForUi(player, card) && uiState.focus() == GameFocus.HAND) {
@@ -320,6 +357,10 @@ public final class TerminalSession {
     }
 
     private static void moveSelection(GameState state, Account account, GameUiState uiState, int delta) {
+        if (uiState.focus() == GameFocus.CHOICE) {
+            state.pendingAction().ifPresent(pending -> moveChoice(uiState, pending.choiceCards().size(), delta));
+            return;
+        }
         if (uiState.focus() == GameFocus.TARGET) {
             List<PlayerState> targets = TerminalRenderer.targets(state, account.id());
             if (!targets.isEmpty()) {
@@ -334,7 +375,27 @@ public final class TerminalSession {
         });
     }
 
+    private static void moveChoice(GameUiState uiState, int size, int delta) {
+        if (size > 0) {
+            uiState.setSelectedChoice(wrap(uiState.selectedChoice() + delta, size));
+        }
+    }
+
     private static void clampSelection(GameState state, Account account, GameUiState uiState) {
+        Optional<PendingAction> choice = state.pendingAction()
+                .filter(pending -> pending.type() == PendingActionType.GENERAL_STORE_PICK)
+                .filter(pending -> pending.expectedAccountId().equals(account.id()));
+        if (choice.isPresent()) {
+            var pending = choice.orElseThrow();
+            uiState.setFocus(GameFocus.CHOICE);
+            if (pending.choiceCards().isEmpty()) {
+                uiState.setSelectedChoice(0);
+            } else if (uiState.selectedChoice() >= pending.choiceCards().size()) {
+                uiState.setSelectedChoice(pending.choiceCards().size() - 1);
+            }
+        } else if (uiState.focus() == GameFocus.CHOICE) {
+            uiState.setFocus(GameFocus.HAND);
+        }
         state.findPlayer(account.id()).ifPresent(player -> {
             if (player.handSize() == 0) {
                 uiState.setSelectedCard(0);
@@ -355,6 +416,15 @@ public final class TerminalSession {
     private void showMessage(SessionIo io, String title, String message) throws IOException {
         io.write(renderer.message(title, message == null ? "" : message));
         io.readKey();
+    }
+
+    private void persistFinishedSafely(GameEngine engine, GameUiState uiState) {
+        try {
+            roomService.persistIfFinished(engine);
+        } catch (RuntimeException exception) {
+            exception.printStackTrace(System.err);
+            uiState.setMessage(exception.getMessage());
+        }
     }
 
     private String currentRoomCode(Account account) {

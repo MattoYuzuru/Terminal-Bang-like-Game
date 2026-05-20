@@ -89,11 +89,11 @@ public final class StandardContent {
         Map<CardKind, CardDefinition> definitions = new EnumMap<>(CardKind.class);
         definitions.put(CardKind.BANG, new CardDefinition(CardKind.BANG, "Bang!", "BROWN", "Attack a player within weapon range. The target may answer with Missed.", true, false));
         definitions.put(CardKind.MISSED, new CardDefinition(CardKind.MISSED, "Missed!", "REACTION", "Cancel one Bang-style attack aimed at you.", false, true));
-        definitions.put(CardKind.BEER, new CardDefinition(CardKind.BEER, "Beer", "BROWN", "Recover one life point. It has no effect with only two players alive.", false, false));
+        definitions.put(CardKind.BEER, new CardDefinition(CardKind.BEER, "Beer", "BROWN", "Recover one life point. Cannot be played at full health and has no effect with only two players alive.", false, false));
         definitions.put(CardKind.CAT_BALOU, new CardDefinition(CardKind.CAT_BALOU, "Cat Balou", "BROWN", "Force any one player to discard one random hand or in-play card.", true, false));
         definitions.put(CardKind.DUEL, new CardDefinition(CardKind.DUEL, "Duel", "BROWN", "Challenge any player. Players alternate Bang responses until one fails and loses one life.", true, false));
         definitions.put(CardKind.GATLING, new CardDefinition(CardKind.GATLING, "Gatling", "BROWN", "All other players must answer with Missed or lose one life.", false, false));
-        definitions.put(CardKind.GENERAL_STORE, new CardDefinition(CardKind.GENERAL_STORE, "General Store", "BROWN", "Reveal one card per alive player; players receive one in turn order.", false, false));
+        definitions.put(CardKind.GENERAL_STORE, new CardDefinition(CardKind.GENERAL_STORE, "General Store", "BROWN", "Reveal one card per alive player; each player chooses one card in turn order.", false, false));
         definitions.put(CardKind.INDIANS, new CardDefinition(CardKind.INDIANS, "Indians!", "BROWN", "All other players must discard Bang or lose one life. Missed and Barrel do not help.", false, false));
         definitions.put(CardKind.PANIC, new CardDefinition(CardKind.PANIC, "Panic!", "BROWN", "Take one random hand or in-play card from a player at distance 1.", true, false));
         definitions.put(CardKind.SALOON, new CardDefinition(CardKind.SALOON, "Saloon", "BROWN", "Every alive player recovers one life point.", false, false));

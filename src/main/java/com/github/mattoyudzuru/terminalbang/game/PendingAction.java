@@ -10,10 +10,12 @@ public record PendingAction(
         CardKind responseKind,
         int requiredResponses,
         List<UUID> remainingAccountIds,
+        List<CardInstance> choiceCards,
         String prompt
 ) {
     public PendingAction {
         remainingAccountIds = List.copyOf(remainingAccountIds);
+        choiceCards = List.copyOf(choiceCards);
     }
 
     public static PendingAction bangReaction(
@@ -29,6 +31,7 @@ public record PendingAction(
                 CardKind.MISSED,
                 requiredResponses,
                 List.of(),
+                List.of(),
                 prompt
         );
     }
@@ -40,6 +43,7 @@ public record PendingAction(
                 opponentAccountId,
                 CardKind.BANG,
                 1,
+                List.of(),
                 List.of(),
                 prompt
         );
@@ -53,6 +57,25 @@ public record PendingAction(
             List<UUID> remainingAccountIds,
             String prompt
     ) {
-        return new PendingAction(type, expectedAccountId, attackerAccountId, responseKind, 1, remainingAccountIds, prompt);
+        return new PendingAction(type, expectedAccountId, attackerAccountId, responseKind, 1, remainingAccountIds, List.of(), prompt);
+    }
+
+    public static PendingAction generalStorePick(
+            UUID expectedAccountId,
+            UUID actorAccountId,
+            List<UUID> remainingAccountIds,
+            List<CardInstance> choiceCards,
+            String prompt
+    ) {
+        return new PendingAction(
+                PendingActionType.GENERAL_STORE_PICK,
+                expectedAccountId,
+                actorAccountId,
+                CardKind.GENERAL_STORE,
+                0,
+                remainingAccountIds,
+                choiceCards,
+                prompt
+        );
     }
 }

@@ -145,7 +145,7 @@ public final class RoomService {
         }
     }
 
-    public void persistIfFinished(GameEngine engine) {
+    public synchronized void persistIfFinished(GameEngine engine) {
         GameState state = engine.state();
         if (state.winner().isEmpty()) {
             return;

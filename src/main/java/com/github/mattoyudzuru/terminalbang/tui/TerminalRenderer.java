@@ -155,7 +155,7 @@ public final class TerminalRenderer {
         builder.append("\r\n\r\n");
 
         state.pendingAction().ifPresentOrElse(
-                pending -> appendPending(builder, state, viewerAccountId, pending),
+                pending -> appendPending(builder, state, viewerAccountId, pending, uiState),
                 () -> appendTurnHint(builder, state, viewerAccountId, uiState)
         );
 
@@ -292,14 +292,28 @@ public final class TerminalRenderer {
         for (int i = 0; i < player.hand().size(); i++) {
             CardInstance card = player.hand().get(i);
             boolean selected = uiState.focus() == GameFocus.HAND && i == uiState.selectedCard();
-            builder.append(selected ? BOLD + color("^", YELLOW) + " " : "  ");
+            builder.append(selected ? BOLD + color(">", YELLOW) + " " : "  ");
             builder.append(cardView(i + 1, card, selected));
-            builder.append("  ");
+            builder.append(selected ? " " + color("<", YELLOW) + RESET + "  " : "  ");
         }
         builder.append("\r\n");
+        builder.append(DIM)
+                .append("Code: 9S = rank+suit for draw! checks; H/D red, S/C black.")
+                .append(RESET)
+                .append("\r\n");
     }
 
-    private static void appendPending(StringBuilder builder, GameState state, UUID viewerAccountId, PendingAction pending) {
+    private static void appendPending(
+            StringBuilder builder,
+            GameState state,
+            UUID viewerAccountId,
+            PendingAction pending,
+            GameUiState uiState
+    ) {
+        if (pending.type() == PendingActionType.GENERAL_STORE_PICK) {
+            appendGeneralStoreChoice(builder, state, viewerAccountId, pending, uiState);
+            return;
+        }
         String response = StandardNames.cardName(pending.responseKind());
         String expected = state.findPlayer(pending.expectedAccountId())
                 .map(PlayerState::nickname)
@@ -326,6 +340,30 @@ public final class TerminalRenderer {
                 .append(". Auto-refresh enabled.\r\n");
     }
 
+    private static void appendGeneralStoreChoice(
+            StringBuilder builder,
+            GameState state,
+            UUID viewerAccountId,
+            PendingAction pending,
+            GameUiState uiState
+    ) {
+        String expected = state.findPlayer(pending.expectedAccountId())
+                .map(PlayerState::nickname)
+                .orElse("Unknown player");
+        if (!pending.expectedAccountId().equals(viewerAccountId)) {
+            builder.append(color(expected, YELLOW))
+                    .append(" is choosing a General Store card. Auto-refresh enabled.\r\n");
+            appendChoiceCards(builder, pending.choiceCards(), -1);
+            return;
+        }
+        int selected = Math.min(uiState.selectedChoice(), Math.max(0, pending.choiceCards().size() - 1));
+        builder.append(BOLD)
+                .append(color("Choose one General Store card.", YELLOW))
+                .append(RESET)
+                .append(" ←/→ or 1-9 select, Enter take, ?, /, or . for help.\r\n");
+        appendChoiceCards(builder, pending.choiceCards(), selected);
+    }
+
     private static void appendTurnHint(StringBuilder builder, GameState state, UUID viewerAccountId, GameUiState uiState) {
         if (state.winner().isPresent()) {
             builder.append("Winner: ").append(color(state.winner().orElseThrow().name(), GREEN)).append(". Press any key.\r\n");
@@ -341,9 +379,46 @@ public final class TerminalRenderer {
         }
         if (uiState.focus() == GameFocus.TARGET) {
             builder.append("Select target: ←/→ move, Enter confirm, Backspace cancel.\r\n");
+            appendTargetList(builder, state, viewerAccountId, uiState);
         } else {
             builder.append("←/→ or 1-9 select card, Enter play, ?, /, or . for help, E end turn, Q exit session.\r\n");
         }
+    }
+
+    private static void appendChoiceCards(StringBuilder builder, List<CardInstance> cards, int selected) {
+        for (int i = 0; i < cards.size(); i++) {
+            CardInstance card = cards.get(i);
+            boolean active = i == selected;
+            builder.append(active ? BOLD + color(">", YELLOW) + " " : "  ");
+            builder.append(cardView(i + 1, card, active));
+            builder.append(active ? " " + color("<", YELLOW) + RESET + "  " : "  ");
+        }
+        builder.append("\r\n");
+    }
+
+    private static void appendTargetList(
+            StringBuilder builder,
+            GameState state,
+            UUID viewerAccountId,
+            GameUiState uiState
+    ) {
+        List<PlayerState> targets = targets(state, viewerAccountId);
+        for (int i = 0; i < targets.size(); i++) {
+            PlayerState target = targets.get(i);
+            boolean active = i == uiState.selectedTarget();
+            builder.append(active ? BOLD + color(">", YELLOW) + " " : "  ");
+            builder.append(i + 1)
+                    .append(" ")
+                    .append(target.nickname())
+                    .append(" HP ")
+                    .append(healthBar(target))
+                    .append(" C")
+                    .append(target.handSize())
+                    .append(" T")
+                    .append(target.inPlaySize());
+            builder.append(active ? " " + color("<", YELLOW) + RESET + "  " : "  ");
+        }
+        builder.append("\r\n");
     }
 
     static List<PlayerState> targets(GameState state, UUID viewerAccountId) {

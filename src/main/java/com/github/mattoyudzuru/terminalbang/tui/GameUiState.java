@@ -2,6 +2,7 @@ package com.github.mattoyudzuru.terminalbang.tui;
 
 final class GameUiState {
     private int selectedCard;
+    private int selectedChoice;
     private int selectedTarget;
     private GameFocus focus = GameFocus.HAND;
     private String message = "";
@@ -12,6 +13,14 @@ final class GameUiState {
 
     void setSelectedCard(int selectedCard) {
         this.selectedCard = Math.max(0, selectedCard);
+    }
+
+    int selectedChoice() {
+        return selectedChoice;
+    }
+
+    void setSelectedChoice(int selectedChoice) {
+        this.selectedChoice = Math.max(0, selectedChoice);
     }
 
     int selectedTarget() {
@@ -38,4 +47,3 @@ final class GameUiState {
         this.message = message == null ? "" : message;
     }
 }
-
